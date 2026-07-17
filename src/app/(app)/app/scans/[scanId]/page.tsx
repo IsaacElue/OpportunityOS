@@ -60,7 +60,7 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
     </div>
 
     <Card className="mt-8 p-6 sm:p-8">
-      <LiveScanProgress progress={progress} />
+      <LiveScanProgress progress={progress} scanId={scan.id} />
     </Card>
 
     <section className="mt-5">

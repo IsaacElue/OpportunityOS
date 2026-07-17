@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -10,9 +10,17 @@ function stageLabel(stage: string | null) {
   return stage?.split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ") ?? "Preparing scan";
 }
 
-export function LiveScanProgress({ progress }: { progress: ScanProgress | null }) {
+export function LiveScanProgress({ progress, scanId }: { progress: ScanProgress | null; scanId: string }) {
   const router = useRouter();
+  const executionTriggered = useRef(false);
   const isTerminal = progress?.status === "completed" || progress?.status === "failed" || progress?.status === "cancelled";
+
+  useEffect(() => {
+    if (progress?.status !== "queued" || executionTriggered.current) return;
+    executionTriggered.current = true;
+    void fetch(`/api/v1/scans/${scanId}/execute`, { method: "POST" })
+      .catch((error) => console.error("Unable to trigger scan execution", { scanId, error }));
+  }, [progress?.status, scanId]);
 
   useEffect(() => {
     if (isTerminal) return;
