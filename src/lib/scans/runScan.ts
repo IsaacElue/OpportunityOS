@@ -5,6 +5,9 @@ import { fetchHackerNewsEvidence } from "@/lib/ingestion/hackernews";
 import { fetchRedditEvidence } from "@/lib/ingestion/reddit";
 import { saveEvidence } from "@/lib/ingestion/saveEvidence";
 import { createOpportunity } from "@/lib/intelligence/createOpportunity";
+import { generateFounderOpportunityReport } from "@/lib/reports/generateReport";
+import { saveReport } from "@/lib/reports/saveReport";
+import type { FounderOpportunityReportInput, ReportEvidence } from "@/lib/reports/types";
 import { scoreOpportunity } from "@/lib/scoring/opportunityScore";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -20,6 +23,35 @@ export type ScanRunSummary = {
   evidenceCollected: number;
   opportunitiesCreated: number;
   completedAt: Date;
+};
+
+type OpportunityReportRow = {
+  id: string;
+  title: string | null;
+  problem: string | null;
+  persona: string | null;
+  industry: string | null;
+  description: string | null;
+  opportunity_score: number | null;
+  opportunity_evidence: Array<{
+    evidence: EvidenceReportRow | EvidenceReportRow[] | null;
+  }> | null;
+};
+
+type EvidenceReportRow = {
+  id: string;
+  title: string | null;
+  content: string;
+  author: string | null;
+  engagement_score: number;
+  published_at: string | null;
+  sources: SourceReportRow | SourceReportRow[] | null;
+};
+
+type SourceReportRow = {
+  type: string;
+  platform: string | null;
+  url: string | null;
 };
 
 function buildSearchQuery(filters: ScanFilters) {
@@ -51,6 +83,11 @@ function scoringInput(evidence: EvidenceItem, painScore: number) {
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message.slice(0, 1000);
   return "The scan workflow failed unexpectedly.";
+}
+
+function reportErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message.slice(0, 500);
+  return "Report generation failed unexpectedly.";
 }
 
 async function collectEvidence(query: string): Promise<EvidenceItem[]> {
@@ -106,6 +143,48 @@ async function findEvidenceId(
   if (!savedEvidence) throw new Error("Saved evidence could not be found for opportunity extraction.");
 
   return savedEvidence.id as string;
+}
+
+async function getReportInput(
+  supabase: ReturnType<typeof createAdminClient>,
+  opportunityId: string
+): Promise<FounderOpportunityReportInput> {
+  const { data, error } = await supabase
+    .from("opportunities")
+    .select("id,title,problem,persona,industry,description,opportunity_score,opportunity_evidence(evidence(id,title,content,author,engagement_score,published_at,sources(type,platform,url)))")
+    .eq("id", opportunityId)
+    .maybeSingle();
+  if (error) throw new Error(`Unable to load opportunity report input: ${error.message}`);
+  if (!data) throw new Error("Opportunity could not be found for report generation.");
+
+  const opportunity = data as unknown as OpportunityReportRow;
+  const evidence = (opportunity.opportunity_evidence ?? []).flatMap(({ evidence: linkedEvidence }) => {
+    if (!linkedEvidence) return [];
+    return Array.isArray(linkedEvidence) ? linkedEvidence : [linkedEvidence];
+  });
+
+  return {
+    opportunity: {
+      id: opportunity.id,
+      title: opportunity.title,
+      problem: opportunity.problem,
+      persona: opportunity.persona,
+      industry: opportunity.industry,
+      description: opportunity.description
+    },
+    evidence: evidence.map((linkedEvidence): ReportEvidence => ({
+      id: linkedEvidence.id,
+      title: linkedEvidence.title,
+      content: linkedEvidence.content,
+      author: linkedEvidence.author,
+      engagementScore: linkedEvidence.engagement_score,
+      publishedAt: linkedEvidence.published_at,
+      source: Array.isArray(linkedEvidence.sources)
+        ? linkedEvidence.sources[0] ?? null
+        : linkedEvidence.sources
+    })),
+    opportunityScore: opportunity.opportunity_score
+  };
 }
 
 async function updateScan(
@@ -212,6 +291,41 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
         progress,
         progress_stage: "scoring",
         progress_message: "Ranking opportunities",
+        opportunity_count: opportunitiesCreated
+      });
+    }
+
+    await updateScan(supabase, scanId, {
+      status: "running",
+      stage: "reporting",
+      progress: 90,
+      progress_stage: "generating_reports",
+      progress_message: "Preparing founder reports",
+      opportunity_count: opportunitiesCreated
+    });
+
+    for (const [index, opportunity] of opportunitiesToScore.entries()) {
+      try {
+        const reportInput = await getReportInput(supabase, opportunity.opportunityId);
+        const report = await generateFounderOpportunityReport(reportInput);
+        if (report) await saveReport(opportunity.opportunityId, report);
+      } catch (error) {
+        console.error("Opportunity report generation failed", {
+          scanId,
+          opportunityId: opportunity.opportunityId,
+          error: reportErrorMessage(error)
+        });
+      }
+
+      const progress = opportunitiesToScore.length === 0
+        ? 99
+        : 90 + Math.round(((index + 1) / opportunitiesToScore.length) * 9);
+      await updateScan(supabase, scanId, {
+        status: "running",
+        stage: "reporting",
+        progress,
+        progress_stage: "generating_reports",
+        progress_message: "Preparing founder reports",
         opportunity_count: opportunitiesCreated
       });
     }
