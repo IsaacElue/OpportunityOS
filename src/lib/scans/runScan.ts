@@ -149,17 +149,19 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       const created = await createOpportunity(evidence, evidenceId);
 
       if (created) {
-        await scoreOpportunity({
-          opportunityId: created.opportunityId,
-          ...scoringInput(evidence, created.extraction.painScore)
-        });
+        if (created.isNew) {
+          await scoreOpportunity({
+            opportunityId: created.opportunityId,
+            ...scoringInput(evidence, created.extraction.painScore)
+          });
+        }
 
         const { error: linkError } = await supabase
           .from("scan_opportunities")
           .upsert({ scan_id: scanId, opportunity_id: created.opportunityId }, { onConflict: "scan_id,opportunity_id" });
         if (linkError) throw new Error(`Unable to link opportunity to scan: ${linkError.message}`);
 
-        opportunitiesCreated += 1;
+        if (created.isNew) opportunitiesCreated += 1;
       }
 
       const progress = evidenceItems.length === 0 ? 90 : 50 + Math.round(((index + 1) / evidenceItems.length) * 40);
