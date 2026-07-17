@@ -1,0 +1,9 @@
+[mcp_servers.context7]
+command = "npx -y @upstash/context7-mcp"
+
+[mcp_servers.github]
+command = "github-mcp-server"
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["@playwright/mcp"]
