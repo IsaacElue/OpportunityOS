@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle, Clock3, FileText } from "lucide-react";
+import { ArrowLeft, Clock3, FileText } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { LiveScanProgress } from "@/components/live-scan-progress";
 import { getScanOpportunities, type ScanOpportunity } from "@/lib/opportunities/getScanOpportunities";
+import { getScanProgress } from "@/lib/scans/getScanProgress";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +28,10 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
     .maybeSingle();
   if (!scan) notFound();
 
-  const opportunities = await getScanOpportunities(scan.id);
+  const [opportunities, progress] = await Promise.all([
+    getScanOpportunities(scan.id),
+    getScanProgress(scan.id)
+  ]);
   const filters = scan.filters as {
     industry?: string;
     buyer_type?: string;
@@ -55,16 +60,7 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
     </div>
 
     <Card className="mt-8 p-6 sm:p-8">
-      <h2 className="text-lg font-semibold">Research status</h2>
-      <p className="mt-2 text-sm leading-6 text-muted">
-        Your brief has been stored. The evidence ingestion and report-generation pipeline is intentionally not active in this milestone.
-      </p>
-      <ol className="mt-7 space-y-4 text-sm">
-        <Step complete label="Research brief saved" />
-        <Step label="Collect permitted source evidence" />
-        <Step label="Qualify opportunity hypotheses" />
-        <Step label="Publish verified Founder Opportunity Reports" />
-      </ol>
+      <LiveScanProgress progress={progress} />
     </Card>
 
     <section className="mt-5">
@@ -105,13 +101,6 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
       </div>
     </Card>
   </>;
-}
-
-function Step({ label, complete = false }: { label: string; complete?: boolean }) {
-  return <li className="flex items-center gap-3 text-muted">
-    {complete ? <CheckCircle2 className="size-5 text-brand" /> : <Circle className="size-5 text-white/25" />}
-    {label}
-  </li>;
 }
 
 function OpportunityResult({ opportunity }: { opportunity: ScanOpportunity }) {
