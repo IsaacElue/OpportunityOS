@@ -133,26 +133,40 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
     const query = buildSearchQuery(scan.filters as ScanFilters);
     if (!query) throw new Error("Scan does not contain enough context to search for evidence.");
 
-    await updateScan(supabase, scanId, { status: "queued", stage: "queued", progress: 0 });
-    await updateScan(supabase, scanId, { status: "running", stage: "collecting_evidence", progress: 10 });
+    await updateScan(supabase, scanId, {
+      status: "running",
+      stage: "collecting_evidence",
+      progress: 10,
+      progress_stage: "collecting_evidence",
+      progress_message: "Searching market signals",
+      evidence_count: 0,
+      opportunity_count: 0
+    });
 
     const evidenceItems = await collectEvidence(query);
     await saveEvidence(evidenceItems);
 
-    // `analyzing` is represented by the stage because `scans.status` only
-    // permits queued, running, completed, failed, and cancelled.
-    await updateScan(supabase, scanId, { status: "running", stage: "analyzing", progress: 50 });
+    await updateScan(supabase, scanId, {
+      status: "running",
+      stage: "analyzing",
+      progress: 50,
+      progress_stage: "analyzing_evidence",
+      progress_message: "Extracting opportunities",
+      evidence_count: evidenceItems.length
+    });
 
     let opportunitiesCreated = 0;
+    const opportunitiesToScore: Array<{ opportunityId: string; evidence: EvidenceItem; painScore: number }> = [];
     for (const [index, evidence] of evidenceItems.entries()) {
       const evidenceId = await findEvidenceId(supabase, evidence);
       const created = await createOpportunity(evidence, evidenceId);
 
       if (created) {
         if (created.isNew) {
-          await scoreOpportunity({
+          opportunitiesToScore.push({
             opportunityId: created.opportunityId,
-            ...scoringInput(evidence, created.extraction.painScore)
+            evidence,
+            painScore: created.extraction.painScore
           });
         }
 
@@ -164,8 +178,42 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
         if (created.isNew) opportunitiesCreated += 1;
       }
 
-      const progress = evidenceItems.length === 0 ? 90 : 50 + Math.round(((index + 1) / evidenceItems.length) * 40);
-      await updateScan(supabase, scanId, { status: "running", stage: "analyzing", progress });
+      const progress = evidenceItems.length === 0 ? 75 : 50 + Math.round(((index + 1) / evidenceItems.length) * 25);
+      await updateScan(supabase, scanId, {
+        status: "running",
+        stage: "analyzing",
+        progress,
+        progress_stage: "analyzing_evidence",
+        progress_message: "Extracting opportunities",
+        opportunity_count: opportunitiesCreated
+      });
+    }
+
+    await updateScan(supabase, scanId, {
+      status: "running",
+      stage: "scoring",
+      progress: 75,
+      progress_stage: "scoring",
+      progress_message: "Ranking opportunities",
+      evidence_count: evidenceItems.length,
+      opportunity_count: opportunitiesCreated
+    });
+
+    for (const [index, opportunity] of opportunitiesToScore.entries()) {
+      await scoreOpportunity({
+        opportunityId: opportunity.opportunityId,
+        ...scoringInput(opportunity.evidence, opportunity.painScore)
+      });
+
+      const progress = opportunitiesToScore.length === 0 ? 90 : 75 + Math.round(((index + 1) / opportunitiesToScore.length) * 15);
+      await updateScan(supabase, scanId, {
+        status: "running",
+        stage: "scoring",
+        progress,
+        progress_stage: "scoring",
+        progress_message: "Ranking opportunities",
+        opportunity_count: opportunitiesCreated
+      });
     }
 
     const completedAt = new Date();
@@ -173,6 +221,10 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       status: "completed",
       stage: "completed",
       progress: 100,
+      progress_stage: "complete",
+      progress_message: "Research complete",
+      evidence_count: evidenceItems.length,
+      opportunity_count: opportunitiesCreated,
       completed_at: completedAt.toISOString(),
       error_code: null,
       error_detail: null
@@ -185,12 +237,15 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       completedAt
     };
   } catch (error) {
+    const message = errorMessage(error);
     try {
       await updateScan(supabase, scanId, {
         status: "failed",
         stage: "failed",
+        progress_stage: "failed",
+        progress_message: message,
         error_code: "scan_orchestration_failed",
-        error_detail: errorMessage(error)
+        error_detail: message
       });
     } catch {
       // Preserve the original workflow failure when status persistence also fails.
