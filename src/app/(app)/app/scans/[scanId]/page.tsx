@@ -2,13 +2,25 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Clock3, FileText } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LiveScanProgress } from "@/components/live-scan-progress";
 import { getScanOpportunities, type ScanOpportunity } from "@/lib/opportunities/getScanOpportunities";
 import { getScanProgress } from "@/lib/scans/getScanProgress";
 import { createClient } from "@/lib/supabase/server";
-import { cn } from "@/lib/utils";
+
+type ScanReport = {
+  id: string;
+  opportunity_id: string;
+  problem: string | null;
+  evidence_summary: string | null;
+  buyer_profile: string | null;
+  existing_workarounds: string | null;
+  ai_advantage: string | null;
+  mvp_suggestion: string | null;
+  validation_experiment: string | null;
+  confidence_score: number | null;
+  opportunities: { title: string | null } | { title: string | null }[] | null;
+};
 
 export default async function ScanDetailPage({ params }: { params: Promise<{ scanId: string }> }) {
   const { scanId } = await params;
@@ -28,10 +40,17 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
     .maybeSingle();
   if (!scan) notFound();
 
-  const [opportunities, progress] = await Promise.all([
+  const [opportunities, progress, reportResult] = await Promise.all([
     getScanOpportunities(scan.id),
-    getScanProgress(scan.id)
+    getScanProgress(scan.id),
+    supabase
+      .from("opportunity_reports")
+      .select("id,opportunity_id,problem,evidence_summary,buyer_profile,existing_workarounds,ai_advantage,mvp_suggestion,validation_experiment,confidence_score,opportunities!inner(title,scan_opportunities!inner(scan_id))")
+      .eq("opportunities.scan_opportunities.scan_id", scan.id)
+      .order("created_at", { ascending: false })
   ]);
+  if (reportResult.error) throw new Error(`Unable to fetch opportunity reports: ${reportResult.error.message}`);
+  const reports = (reportResult.data ?? []) as unknown as ScanReport[];
   const filters = scan.filters as {
     industry?: string;
     buyer_type?: string;
@@ -84,22 +103,26 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
       </Card>}
     </section>
 
-    <Card className="mt-5 border-dashed p-6">
-      <div className="flex gap-4">
+    <section className="mt-5">
+      <div className="flex items-center gap-3">
         <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">
           <FileText className="size-5" />
         </div>
         <div>
-          <h2 className="font-semibold">Founder Opportunity Report</h2>
-          <p className="mt-1 text-sm leading-6 text-muted">
-            This is where a source-linked report will appear: problem, evidence, buyer, workaround, AI advantage, MVP suggestion, validation experiment, and confidence.
-          </p>
-          <Link className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "mt-4")} href="/app/reports/placeholder">
-            Preview report structure
-          </Link>
+          <p className="text-sm font-medium text-brand">Founder Opportunity Report</p>
+          <h2 className="mt-1 text-xl font-semibold">Founder-ready opportunity analysis</h2>
         </div>
       </div>
-    </Card>
+
+      {reports.length > 0 ? <div className="mt-4 grid gap-4">
+        {reports.map((report) => <FounderOpportunityReportCard key={report.id} report={report} />)}
+      </div> : <Card className="mt-4 border-dashed p-6">
+        <p className="font-medium">Report generation in progress</p>
+        <p className="mt-1 text-sm leading-6 text-muted">
+          Evidence-backed founder reports will appear here once opportunity analysis is complete.
+        </p>
+      </Card>}
+    </section>
   </>;
 }
 
@@ -150,5 +173,40 @@ function Score({ label, value }: { label: string; value: number | null }) {
   return <div className="rounded-lg bg-white/[0.04] px-3 py-2">
     <dt className="text-xs text-muted">{label}</dt>
     <dd className="mt-0.5 font-medium">{value ?? "-"}</dd>
+  </div>;
+}
+
+function FounderOpportunityReportCard({ report }: { report: ScanReport }) {
+  const opportunity = Array.isArray(report.opportunities) ? report.opportunities[0] ?? null : report.opportunities;
+
+  return <Card className="p-5 sm:p-6">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium text-brand">Founder Opportunity Report</p>
+        <h3 className="mt-1 text-lg font-semibold">{opportunity?.title ?? "Opportunity analysis"}</h3>
+      </div>
+      <div className="rounded-xl border border-brand/20 bg-brand/10 px-3 py-2 text-right">
+        <p className="text-xs text-muted">Confidence score</p>
+        <p className="text-xl font-semibold text-brand">{report.confidence_score ?? "-"}</p>
+      </div>
+    </div>
+
+    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+      <ReportSection label="Problem" content={report.problem} />
+      <ReportSection label="Evidence Summary" content={report.evidence_summary} />
+      <ReportSection label="Buyer Profile" content={report.buyer_profile} />
+      <ReportSection label="Existing Workarounds" content={report.existing_workarounds} />
+      <ReportSection label="AI Advantage" content={report.ai_advantage} />
+      <ReportSection label="MVP Suggestion" content={report.mvp_suggestion} />
+      <ReportSection label="Validation Experiment" content={report.validation_experiment} />
+      <ReportSection label="Confidence Score" content={report.confidence_score?.toString() ?? null} />
+    </div>
+  </Card>;
+}
+
+function ReportSection({ label, content }: { label: string; content: string | null }) {
+  return <div className="rounded-lg bg-white/[0.04] p-4">
+    <h4 className="text-xs font-medium uppercase tracking-wide text-muted">{label}</h4>
+    <p className="mt-2 text-sm leading-6">{content ?? "Not available"}</p>
   </div>;
 }
