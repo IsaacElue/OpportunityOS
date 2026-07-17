@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { errorResponse } from "@/lib/errors";
+import { runScan } from "@/lib/scans/runScan";
 
 const scanSchema = z.object({ scope: z.object({ industry: z.string().min(2).max(80), buyer_type: z.string().min(2).max(80), geography: z.string().min(2).max(64), problem_hints: z.array(z.string().min(1).max(500)).max(3).default([]) }) });
 
@@ -26,5 +27,13 @@ export async function POST(request: Request) {
   if (existing) return NextResponse.json(existing, { status: 202 });
   const { data: scan, error } = await supabase.from("scans").insert({ organization_id: membership.organization_id, requested_by: user.id, idempotency_key: idempotencyKey, filters: parsed.data.scope, status: "queued", stage: "brief_created", progress: 0 }).select("id,status").single();
   if (error) return errorResponse(500, "scan_create_failed", "We could not create that research brief.", true);
+  after(async () => {
+    try {
+      await runScan(scan.id);
+    } catch (orchestrationError) {
+      // runScan records the failed status and error detail before rethrowing.
+      console.error("Scan orchestration failed", { scanId: scan.id, error: orchestrationError });
+    }
+  });
   return NextResponse.json(scan, { status: 202 });
 }
