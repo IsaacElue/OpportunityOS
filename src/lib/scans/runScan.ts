@@ -2,6 +2,7 @@ import "server-only";
 
 import type { EvidenceItem } from "@/lib/ingestion/types";
 import { fetchHackerNewsEvidence } from "@/lib/ingestion/hackernews";
+import { fetchRedditEvidence } from "@/lib/ingestion/reddit";
 import { saveEvidence } from "@/lib/ingestion/saveEvidence";
 import { createOpportunity } from "@/lib/intelligence/createOpportunity";
 import { scoreOpportunity } from "@/lib/scoring/opportunityScore";
@@ -50,6 +51,29 @@ function scoringInput(evidence: EvidenceItem, painScore: number) {
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message.slice(0, 1000);
   return "The scan workflow failed unexpectedly.";
+}
+
+async function collectEvidence(query: string): Promise<EvidenceItem[]> {
+  const sources = [
+    { name: "Hacker News", fetch: () => fetchHackerNewsEvidence(query) },
+    { name: "Reddit", fetch: () => fetchRedditEvidence(query) }
+  ];
+  const results = await Promise.allSettled(sources.map((source) => source.fetch()));
+  const evidenceItems: EvidenceItem[] = [];
+
+  for (const [index, result] of results.entries()) {
+    if (result.status === "fulfilled") {
+      evidenceItems.push(...result.value);
+      continue;
+    }
+    console.error("Evidence source failed", { source: sources[index].name, error: result.reason });
+  }
+
+  if (results.every((result) => result.status === "rejected")) {
+    throw new Error("All evidence sources failed.");
+  }
+
+  return evidenceItems;
 }
 
 async function findEvidenceId(
@@ -112,7 +136,7 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
     await updateScan(supabase, scanId, { status: "queued", stage: "queued", progress: 0 });
     await updateScan(supabase, scanId, { status: "running", stage: "collecting_evidence", progress: 10 });
 
-    const evidenceItems = await fetchHackerNewsEvidence(query);
+    const evidenceItems = await collectEvidence(query);
     await saveEvidence(evidenceItems);
 
     // `analyzing` is represented by the stage because `scans.status` only
