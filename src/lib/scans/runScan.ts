@@ -6,7 +6,7 @@ import { fetchRedditEvidence } from "@/lib/ingestion/reddit";
 import { saveEvidence } from "@/lib/ingestion/saveEvidence";
 import { createOpportunity } from "@/lib/intelligence/createOpportunity";
 import { scoreOpportunity } from "@/lib/scoring/opportunityScore";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type ScanFilters = {
   industry?: string;
@@ -77,7 +77,7 @@ async function collectEvidence(query: string): Promise<EvidenceItem[]> {
 }
 
 async function findEvidenceId(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   evidence: EvidenceItem
 ) {
   let sourceId: string | undefined;
@@ -109,7 +109,7 @@ async function findEvidenceId(
 }
 
 async function updateScan(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   scanId: string,
   values: Record<string, unknown>
 ) {
@@ -119,7 +119,7 @@ async function updateScan(
 
 /** Execute ingestion, opportunity extraction, scoring, and scan linkage for one research brief. */
 export async function runScan(scanId: string): Promise<ScanRunSummary> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   try {
     const { data: scan, error: scanError } = await supabase

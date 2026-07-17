@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import type { OpportunityExtraction } from "@/lib/intelligence/types";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_MODEL = "gpt-5-mini";
@@ -52,7 +52,7 @@ function responseText(payload: ResponsesApiPayload) {
 export async function deduplicateOpportunity(
   candidate: OpportunityExtraction
 ): Promise<OpportunityDeduplicationResult> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("opportunities")
     .select("id,title,problem,description")

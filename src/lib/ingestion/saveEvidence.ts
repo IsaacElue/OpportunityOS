@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { EvidenceItem } from "@/lib/ingestion/types";
 
 export type SaveEvidenceResult = {
@@ -48,7 +48,7 @@ export async function saveEvidence(items: EvidenceItem[]): Promise<SaveEvidenceR
     return { sourcesCreated: 0, evidenceCreated: 0, duplicateUrlsSkipped };
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const urls = uniqueItems.flatMap((item) => item.url ? [item.url] : []);
   const sourceIdsByUrl = new Map<string, string>();
 

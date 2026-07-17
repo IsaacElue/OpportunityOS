@@ -4,7 +4,7 @@ import type { EvidenceItem } from "@/lib/ingestion/types";
 import { deduplicateOpportunity } from "@/lib/intelligence/deduplicate";
 import { extractOpportunity } from "@/lib/intelligence/extractor";
 import type { OpportunityExtraction } from "@/lib/intelligence/types";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type CreatedOpportunity = {
   opportunityId: string;
@@ -25,7 +25,7 @@ export async function createOpportunity(
   if (!extraction) return null;
 
   const duplicate = await deduplicateOpportunity(extraction);
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   if (duplicate.isDuplicate && duplicate.existingOpportunityId) {
     const { error: relationshipError } = await supabase
       .from("opportunity_evidence")
