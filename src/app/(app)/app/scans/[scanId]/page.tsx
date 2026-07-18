@@ -78,9 +78,7 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
       </span>
     </div>
 
-    <Card className="mt-8 p-6 sm:p-8">
-      <ScoutInvestigation progress={progress} scanId={scan.id} />
-    </Card>
+    <ScoutInvestigation progress={progress} scanId={scan.id} createdAt={scan.requested_at}>
 
     <section id="opportunity-results" className="mt-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -123,6 +121,7 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
         </p>
       </Card>}
     </section>
+    </ScoutInvestigation>
   </>;
 }
 

@@ -1,83 +1,74 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Loader2, Sparkles } from "lucide-react";
+import { Check, Circle, Loader2, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { ScoutAvatar } from "@/components/scout-avatar";
+import { TypingIndicator } from "@/components/typing-indicator";
+import { Card } from "@/components/ui/card";
 import type { ScanProgress } from "@/lib/scans/getScanProgress";
-import { cn } from "@/lib/utils";
 
-const investigationSteps = [
-  { id: "collecting", title: "Searching founder communities", detail: "Looking across startup conversations" },
-  { id: "analyzing", title: "Reading discussions", detail: "Grouping similar founder complaints" },
-  { id: "scoring", title: "Ranking opportunities", detail: "Scoring the most promising signals" },
-  { id: "reporting", title: "Building your Founder Opportunity Report", detail: "Turning evidence into founder-ready briefs" }
+type ScoutInvestigationProps = {
+  progress: ScanProgress | null;
+  scanId: string;
+  createdAt: string | null;
+  children: ReactNode;
+};
+
+type TimelineStage = "collecting_evidence" | "analyzing_evidence" | "scoring" | "generating_reports";
+
+const timeline = [
+  { id: "brief", label: "Brief created" },
+  { id: "collecting_evidence", label: "Searching founder discussions" },
+  { id: "analyzing_evidence", label: "Reading conversations" },
+  { id: "scoring", label: "Ranking ideas" },
+  { id: "generating_reports", label: "Building Founder Opportunity Report" }
 ] as const;
 
-type InvestigationStage = "queued" | "collecting" | "analyzing" | "scoring" | "reporting" | "completed" | "failed";
+const stageMessages: Record<string, string> = {
+  queued: "I’m preparing the investigation.",
+  collecting_evidence: "I’m searching startup communities and evidence sources.",
+  analyzing_evidence: "I’m reading conversations and identifying repeated problems.",
+  scoring: "I’m ranking opportunities based on evidence.",
+  generating_reports: "I found something interesting. I’m building the founder report.",
+  completed: "I found promising opportunities.",
+  failed: "I encountered an issue during investigation."
+};
 
-function investigationStage(progress: ScanProgress | null): InvestigationStage {
-  if (!progress || progress.status === "queued") return "queued";
-  if (progress.status === "failed") return "failed";
-  if (progress.status === "completed") return "completed";
-
-  switch (progress.progressStage) {
-    case "collecting_evidence": return "collecting";
-    case "analyzing_evidence": return "analyzing";
-    case "scoring": return "scoring";
-    case "generating_reports": return "reporting";
-    default: return "queued";
-  }
+function currentStage(progress: ScanProgress | null): TimelineStage | null {
+  if (!progress || progress.status === "queued") return null;
+  if (progress.progressStage === "collecting_evidence") return "collecting_evidence";
+  if (progress.progressStage === "analyzing_evidence") return "analyzing_evidence";
+  if (progress.progressStage === "scoring") return "scoring";
+  if (progress.progressStage === "generating_reports") return "generating_reports";
+  return null;
 }
 
-function scoutMessage(stage: InvestigationStage, opportunityCount: number) {
-  switch (stage) {
-    case "queued": return "I’m getting everything ready.";
-    case "collecting": return "I’m searching founder communities.";
-    case "analyzing": return "I’m reading discussions.";
-    case "scoring": return "I’m ranking opportunities.";
-    case "reporting": return "I’m building your Founder Opportunity Report.";
-    case "completed": return `I found ${opportunityCount} ${opportunityCount === 1 ? "opportunity" : "opportunities"}.`;
-    case "failed": return "I hit a problem while investigating.";
-  }
+function messageFor(progress: ScanProgress | null) {
+  if (!progress) return stageMessages.queued;
+  if (progress.status === "completed") return stageMessages.completed;
+  if (progress.status === "failed") return stageMessages.failed;
+  return stageMessages[progress.progressStage ?? progress.status] ?? progress.progressMessage ?? stageMessages.queued;
 }
 
-function activeStepIndex(stage: InvestigationStage) {
-  if (stage === "collecting") return 0;
-  if (stage === "analyzing") return 1;
-  if (stage === "scoring") return 2;
-  if (stage === "reporting") return 3;
-  if (stage === "completed") return investigationSteps.length;
-  return -1;
-}
-
-function progressPercentage(stage: InvestigationStage) {
-  switch (stage) {
-    case "queued": return 0;
-    case "collecting": return 20;
-    case "analyzing": return 50;
-    case "scoring": return 75;
-    case "reporting": return 90;
-    case "completed": return 100;
-    case "failed": return 0;
-  }
-}
-
-function formatTimestamp(value: string) {
+function formatTimestamp(value: string | null) {
+  if (!value) return "Just now";
   return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-export function ScoutInvestigation({ progress, scanId }: { progress: ScanProgress | null; scanId: string }) {
+export function ScoutInvestigation({ progress, scanId, createdAt, children }: ScoutInvestigationProps) {
   const router = useRouter();
   const executionTriggered = useRef(false);
-  const hasScrolledToResults = useRef(false);
-  const [stepTimestamps, setStepTimestamps] = useState<Record<string, string>>({});
-  const stage = investigationStage(progress);
-  const currentStepIndex = activeStepIndex(stage);
-  const percentage = progressPercentage(stage);
-  const isTerminal = stage === "completed" || stage === "failed";
+  const stage = currentStage(progress);
+  const previousStage = useRef<string | null>(null);
+  const [isTyping, setIsTyping] = useState(true);
+  const [stageTimestamps, setStageTimestamps] = useState<Record<string, string>>(
+    (): Record<string, string> => createdAt ? { brief: createdAt } : {}
+  );
+  const isComplete = progress?.status === "completed";
+  const isTerminal = isComplete || progress?.status === "failed" || progress?.status === "cancelled";
 
   useEffect(() => {
     if (progress?.status !== "queued" || executionTriggered.current) return;
@@ -93,86 +84,100 @@ export function ScoutInvestigation({ progress, scanId }: { progress: ScanProgres
   }, [isTerminal, router]);
 
   useEffect(() => {
-    const completedCount = stage === "completed" ? investigationSteps.length : Math.max(currentStepIndex, 0);
-    if (completedCount === 0) return;
+    const nextStage = progress?.status === "completed" || progress?.status === "failed"
+      ? progress.status
+      : stage ?? "queued";
+    if (previousStage.current === nextStage) return;
 
-    setStepTimestamps((timestamps) => {
-      const recordedAt = progress?.completedAt ?? new Date().toISOString();
-      let changed = false;
-      const next = { ...timestamps };
-      for (let index = 0; index < completedCount; index += 1) {
-        const step = investigationSteps[index];
-        if (!next[step.id]) {
-          next[step.id] = recordedAt;
-          changed = true;
-        }
-      }
-      return changed ? next : timestamps;
-    });
-  }, [currentStepIndex, progress?.completedAt, stage]);
+    previousStage.current = nextStage;
+    setIsTyping(true);
+    const timer = window.setTimeout(() => setIsTyping(false), 800);
+    return () => window.clearTimeout(timer);
+  }, [progress?.status, stage]);
 
   useEffect(() => {
-    if (stage !== "completed" || hasScrolledToResults.current) return;
-    hasScrolledToResults.current = true;
-    document.getElementById("opportunity-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [stage]);
+    setStageTimestamps((timestamps) => {
+      const recordedAt = progress?.completedAt ?? new Date().toISOString();
+      const next = { ...timestamps };
+      if (!next.brief) next.brief = createdAt ?? recordedAt;
+      if (stage && !next[stage]) next[stage] = recordedAt;
+      if (isComplete) {
+        for (const item of timeline) {
+          if (!next[item.id]) next[item.id] = recordedAt;
+        }
+      }
+      return next;
+    });
+  }, [createdAt, isComplete, progress?.completedAt, stage]);
 
-  return <div aria-live="polite">
-    <div className="flex items-start gap-3">
-      <ScoutAvatar size="md" />
-      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.04] p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-semibold">Scout</p>
-          <p className="text-xs text-muted">{percentage}% complete</p>
-        </div>
-        <AnimatePresence mode="wait">
-          <motion.p key={stage} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} className="mt-2 text-sm leading-6 text-muted">
-            {scoutMessage(stage, progress?.opportunityCount ?? 0)}
-          </motion.p>
-        </AnimatePresence>
-      </div>
-    </div>
+  const activeIndex = stage ? timeline.findIndex((item) => item.id === stage) : -1;
 
-    <ol className="mt-6 space-y-1">
-      {investigationSteps.map((step, index) => {
-        const isComplete = currentStepIndex > index;
-        const isCurrent = currentStepIndex === index;
-        const isFuture = !isComplete && !isCurrent;
-        const timestamp = stepTimestamps[step.id];
-
-        return <li key={step.id} className={cn("relative flex gap-3 pb-5 last:pb-0", isFuture && "opacity-35")}>
-          {index < investigationSteps.length - 1 ? <span className={cn("absolute left-[17px] top-9 h-[calc(100%-18px)] w-px", isComplete ? "bg-brand/50" : "bg-white/10")} /> : null}
-          <motion.span
-            initial={false}
-            animate={isCurrent ? { scale: [1, 1.12, 1] } : { scale: 1 }}
-            transition={isCurrent ? { duration: 1.4, repeat: Infinity } : { duration: 0.2 }}
-            className={cn(
-              "relative z-10 grid size-9 shrink-0 place-items-center rounded-full border",
-              isComplete && "border-brand/30 bg-brand text-brand-ink",
-              isCurrent && "border-brand/40 bg-brand/15 text-brand",
-              isFuture && "border-white/10 bg-white/[0.03] text-muted"
-            )}
-          >
-            {isComplete ? <Check className="size-4" /> : isCurrent ? <Loader2 className="size-4 animate-spin" /> : <span className="size-1.5 rounded-full bg-current" />}
-          </motion.span>
-          <div className="min-w-0 pt-1.5">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <p className={cn("text-sm font-medium", isCurrent && "text-brand")}>{step.title}</p>
-              {isComplete && timestamp ? <motion.time initial={{ opacity: 0 }} animate={{ opacity: 1 }} dateTime={timestamp} className="text-xs text-brand/80">✓ {formatTimestamp(timestamp)}</motion.time> : null}
-            </div>
-            <p className="mt-1 text-xs leading-5 text-muted">{step.detail}</p>
+  return <>
+    <Card className="relative mt-8 overflow-hidden p-5 sm:p-7">
+      <div className="pointer-events-none absolute -right-16 -top-20 size-52 rounded-full bg-brand/10 blur-3xl" />
+      <div className="relative flex items-start gap-4">
+        <ScoutAvatar size="lg" />
+        <div className="min-w-0 flex-1 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold">Scout is investigating</h2>
+            <span className="rounded-full border border-brand/20 bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand">Live research</span>
           </div>
-        </li>;
-      })}
-    </ol>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${progress?.status ?? "queued"}-${progress?.progressStage ?? "queued"}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="mt-3 max-w-2xl rounded-2xl rounded-tl-sm border border-white/10 bg-black/15 p-4 text-sm leading-6 text-muted"
+            >
+              {isComplete ? <><p className="font-medium text-ink">Investigation complete.</p><p className="mt-1">I found {progress?.opportunityCount ?? 0} evidence-backed {progress?.opportunityCount === 1 ? "opportunity" : "opportunities"} worth exploring.</p></> : <p>{messageFor(progress)}</p>}
+              {isTyping && !isTerminal ? <div className="mt-3"><TypingIndicator /></div> : null}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
 
-    <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4 text-xs text-muted">
-      <span>{progress?.progressMessage ?? "Preparing your investigation"}</span>
-      <span>{percentage}% complete</span>
-    </div>
+      <ol className="relative mt-7 space-y-1" aria-label="Investigation timeline">
+        {timeline.map((item, index) => {
+          const isBrief = item.id === "brief";
+          const isDone = isComplete || isBrief || (activeIndex > index && activeIndex !== -1);
+          const isActive = !isTerminal && activeIndex === index;
+          const isFuture = !isDone && !isActive;
+          const observedAt = stageTimestamps[item.id];
+          const timestamp = observedAt
+            ? formatTimestamp(observedAt)
+            : isActive
+              ? "Now"
+              : isDone
+                ? "Earlier"
+                : "Upcoming";
 
-    {stage === "completed" ? <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-4 flex items-center gap-2 rounded-xl border border-brand/20 bg-brand/10 p-3 text-sm text-brand">
-      <Sparkles className="size-4" />Your opportunity results are ready below.
-    </motion.div> : null}
-  </div>;
+          return <motion.li
+            key={item.id}
+            layout
+            className={"relative flex gap-3 rounded-xl px-2 py-3 transition-colors " + (isFuture ? "opacity-45" : "")}
+          >
+            {index < timeline.length - 1 ? <span className={"absolute bottom-0 left-[1.15rem] top-9 w-px " + (isDone ? "bg-brand/50" : "bg-white/10")} /> : null}
+            <span className={"relative z-10 grid size-7 shrink-0 place-items-center rounded-full border " + (isDone ? "border-brand/30 bg-brand text-brand-ink" : isActive ? "border-brand/40 bg-brand/10 text-brand" : "border-white/10 bg-white/[0.04] text-muted")}>
+              {isDone ? <Check className="size-4" /> : isActive ? <Loader2 className="size-4 animate-spin" /> : <Circle className="size-3" />}
+            </span>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className={isActive ? "font-medium text-ink" : "text-sm font-medium"}>{item.label}</p>
+                <time dateTime={observedAt} className="text-xs text-muted">{timestamp}</time>
+              </div>
+              {isActive ? <p className="mt-1 flex items-center gap-1.5 text-sm text-brand"><Search className="size-3.5 animate-pulse" />{progress?.progressMessage ?? "Working through the evidence"}</p> : null}
+            </div>
+          </motion.li>;
+        })}
+      </ol>
+    </Card>
+
+    <AnimatePresence initial={false}>
+      {isComplete ? <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.15 }}>
+        {children}
+      </motion.div> : null}
+    </AnimatePresence>
+  </>;
 }
