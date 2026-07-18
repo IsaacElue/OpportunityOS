@@ -34,12 +34,24 @@ export type ScoutPreviousScan = {
   opportunityCount: number;
 };
 
+export type ScoutIdentity = {
+  name: string;
+  role: string;
+  personalityTraits: readonly string[];
+};
+
 export type ScoutContext = {
+  identity: ScoutIdentity;
   filters: {
     industry: string | null;
     geography: string | null;
     problemHints: string[];
   };
+  memories: ScoutMemory[];
+  previous_scans: ScoutPreviousScan[];
+  /** @deprecated Use previous_scans for new Scout context consumers. */
   founderPersona: string | null;
+  /** @deprecated Use previous_scans for new Scout context consumers. */
   previousScanHistory: ScoutPreviousScan[];
 };
+import type { ScoutMemory } from "@/lib/scout/memory/types";

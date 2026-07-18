@@ -1,8 +1,13 @@
+import { scoutIdentity } from "@/lib/scout/identity";
+import type { ScoutMemory } from "@/lib/scout/memory/types";
 import type { ScoutContext, ScoutPreviousScan, ScoutScanFilters } from "@/lib/scout/types";
 
-type BuildScoutContextInput = {
+export type BuildScoutContextInput = {
   filters: ScoutScanFilters;
   founderPersona?: string | null;
+  memories?: ScoutMemory[];
+  previousScans?: ScoutPreviousScan[];
+  /** @deprecated Use previousScans for new Scout context consumers. */
   previousScanHistory?: ScoutPreviousScan[];
 };
 
@@ -10,15 +15,22 @@ type BuildScoutContextInput = {
 export function buildScoutContext({
   filters,
   founderPersona,
-  previousScanHistory = []
+  memories = [],
+  previousScans,
+  previousScanHistory
 }: BuildScoutContextInput): ScoutContext {
+  const scanHistory = previousScans ?? previousScanHistory ?? [];
+
   return {
+    identity: scoutIdentity,
     filters: {
       industry: filters.industry ?? null,
       geography: filters.geography ?? null,
       problemHints: filters.problem_hints?.filter((hint) => Boolean(hint.trim())) ?? []
     },
+    memories,
+    previous_scans: scanHistory,
     founderPersona: founderPersona ?? filters.buyer_type ?? null,
-    previousScanHistory
+    previousScanHistory: scanHistory
   };
 }
