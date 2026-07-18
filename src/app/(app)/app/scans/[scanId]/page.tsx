@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Clock3, FileText } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { LiveScanProgress } from "@/components/live-scan-progress";
+import { ScoutInvestigation } from "@/components/scout-investigation";
 import { getScanOpportunities, type ScanOpportunity } from "@/lib/opportunities/getScanOpportunities";
 import { getScanProgress } from "@/lib/scans/getScanProgress";
 import { createClient } from "@/lib/supabase/server";
@@ -79,10 +79,10 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
     </div>
 
     <Card className="mt-8 p-6 sm:p-8">
-      <LiveScanProgress progress={progress} scanId={scan.id} />
+      <ScoutInvestigation progress={progress} scanId={scan.id} />
     </Card>
 
-    <section className="mt-5">
+    <section id="opportunity-results" className="mt-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-brand">Discovery results</p>
