@@ -9,6 +9,7 @@ export {
 } from "@/lib/scout/brain";
 export { scoutIdentity } from "@/lib/scout/identity";
 export { getScoutFeedback, saveScoutFeedback } from "@/lib/scout/feedback";
+export { createScoutExecution, getScoutExecutions, updateScoutExecutionStatus } from "@/lib/scout/executions";
 export { getScoutMemories, saveScoutMemory } from "@/lib/scout/memory";
 export { getScoutObjective, getScoutObjectives, saveScoutObjective } from "@/lib/scout/objectives";
 export { executeScoutTool, getAvailableTools } from "@/lib/scout/tools";
@@ -61,6 +62,13 @@ export type {
   ScoutFeedback,
   ScoutFeedbackType
 } from "@/lib/scout/feedback";
+export type {
+  CreateScoutExecutionInput,
+  GetScoutExecutionsInput,
+  ScoutExecution,
+  ScoutExecutionStatus,
+  UpdateScoutExecutionStatusInput
+} from "@/lib/scout/executions";
 export type {
   GetScoutMemoriesInput,
   SaveScoutMemoryInput,
