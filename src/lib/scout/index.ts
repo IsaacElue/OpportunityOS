@@ -14,6 +14,13 @@ export { executeScoutTool, getAvailableTools } from "@/lib/scout/tools";
 export { reasonWithScout } from "@/lib/scout/intelligence";
 export { startScoutResearch, toScoutScanRequest } from "@/lib/scout/research";
 export {
+  appendMessage,
+  createConversation,
+  getConversation,
+  getRecentMessages,
+  listConversations
+} from "@/lib/scout/conversation";
+export {
   analyzingPatterns,
   evidenceFound,
   opportunityFound,
@@ -65,3 +72,13 @@ export type {
   StartScoutResearchInput,
   StartScoutResearchResult
 } from "@/lib/scout/research";
+export type {
+  AppendMessageInput,
+  CreateConversationInput,
+  GetConversationInput,
+  GetRecentMessagesInput,
+  ListConversationsInput,
+  ScoutConversation,
+  ScoutConversationMessage,
+  ScoutConversationRole
+} from "@/lib/scout/conversation";

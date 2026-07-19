@@ -23,16 +23,17 @@ function scopeLabel({ context }: HandleScoutMessageInput) {
 export function handleScoutMessage(input: HandleScoutMessageInput): HandleScoutMessageResult {
   const shouldResearch = researchIntentPatterns.some((pattern) => pattern.test(input.message));
   const scope = scopeLabel(input);
+  const conversationPrefix = input.recentMessages?.length ? "Continuing our conversation, " : "";
 
   if (shouldResearch) {
     return {
       shouldResearch: true,
-      response: `I can investigate ${scope}. I will create a research brief and look for evidence-backed opportunities.`
+      response: `${conversationPrefix}I can investigate ${scope}. I will create a research brief and look for evidence-backed opportunities.`
     };
   }
 
   return {
     shouldResearch: false,
-    response: `I am Scout, your opportunity research teammate. Tell me what you want to explore in ${scope}, and I can investigate the market, evidence, and founder pain.`
+    response: `${conversationPrefix}I am Scout, your opportunity research teammate. Tell me what you want to explore in ${scope}, and I can investigate the market, evidence, and founder pain.`
   };
 }
