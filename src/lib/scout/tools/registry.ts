@@ -6,6 +6,8 @@ import type { EvidenceItem } from "@/lib/ingestion/types";
 import { extractOpportunity } from "@/lib/intelligence/extractor";
 import type { OpportunityExtraction } from "@/lib/intelligence/types";
 import { getScoutMemories } from "@/lib/scout/memory/getMemory";
+import { saveScoutMemory } from "@/lib/scout/memory/saveMemory";
+import type { ScoutMemoryType } from "@/lib/scout/memory/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { startScoutResearch } from "@/lib/scout/research/startResearch";
 import type { ScoutTool, ToolResult } from "@/lib/scout/tools/types";
@@ -35,6 +37,22 @@ type SearchMemoryInput = {
   query?: unknown;
   organization_id?: unknown;
 };
+
+type SaveMemoryToolInput = {
+  organization_id?: unknown;
+  user_id?: unknown;
+  type?: unknown;
+  content?: unknown;
+  metadata?: unknown;
+};
+
+const scoutMemoryTypes = new Set<ScoutMemoryType>([
+  "preference",
+  "rejection",
+  "interest",
+  "goal",
+  "feedback"
+]);
 
 function asText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -115,6 +133,21 @@ function memorySearchFailure(startedAt: number, message: string): ToolResult {
       execution_ms: durationSince(startedAt)
     }
   };
+}
+
+function memorySaveFailure(startedAt: number, message: string): ToolResult {
+  return {
+    success: false,
+    message,
+    data: {
+      saved: false,
+      execution_ms: durationSince(startedAt)
+    }
+  };
+}
+
+function isMetadata(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 const evidenceSearchTool: ScoutTool = {
@@ -342,12 +375,75 @@ const searchMemoryTool: ScoutTool = {
   }
 };
 
+const saveMemoryTool: ScoutTool = {
+  name: "save_memory",
+  description: "Save a new organization-scoped Scout memory without changing existing memories.",
+  async execute(input) {
+    const startedAt = Date.now();
+    if (!input || typeof input !== "object") {
+      return memorySaveFailure(startedAt, "Scout memory saving requires organization and content details.");
+    }
+
+    const request = input as SaveMemoryToolInput;
+    const organizationId = asText(request.organization_id);
+    const userId = asText(request.user_id);
+    const content = asText(request.content);
+    const memoryType = asText(request.type);
+    if (!organizationId || !content) {
+      return memorySaveFailure(startedAt, "Scout memory saving requires an organization identifier and content.");
+    }
+    if (!userId) {
+      return memorySaveFailure(startedAt, "Scout memory saving requires a trusted user identifier.");
+    }
+    if (!scoutMemoryTypes.has(memoryType as ScoutMemoryType)) {
+      return memorySaveFailure(startedAt, "Scout memory saving requires a supported memory type.");
+    }
+    if (request.metadata !== undefined && !isMetadata(request.metadata)) {
+      return memorySaveFailure(startedAt, "Scout memory metadata must be an object.");
+    }
+
+    try {
+      const supabase = createAdminClient();
+      const { data: membership, error: membershipError } = await supabase
+        .from("organization_members")
+        .select("organization_id")
+        .eq("organization_id", organizationId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (membershipError || !membership) {
+        return memorySaveFailure(startedAt, "Scout could not save that memory.");
+      }
+
+      const memory = await saveScoutMemory({
+        organization_id: organizationId,
+        user_id: userId,
+        memory_type: memoryType as ScoutMemoryType,
+        content,
+        metadata: request.metadata
+      });
+
+      return {
+        success: true,
+        message: "Scout saved that memory.",
+        data: {
+          memory_id: memory.id,
+          saved: true,
+          execution_ms: durationSince(startedAt)
+        }
+      };
+    } catch {
+      return memorySaveFailure(startedAt, "Scout could not save that memory.");
+    }
+  }
+};
+
 const registeredTools: ScoutTool[] = [
   evidenceSearchTool,
   opportunityAnalysisTool,
   createResearchTool,
   getReportTool,
-  searchMemoryTool
+  searchMemoryTool,
+  saveMemoryTool
 ];
 
 /** Return the tools Scout can call now or in future runtime integrations. */
