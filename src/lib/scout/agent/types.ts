@@ -1,4 +1,6 @@
 import type { ScoutBrainContext } from "@/lib/scout/brain/types";
+import type { ScoutDecision } from "@/lib/scout/intelligence/types";
+import type { ToolResult } from "@/lib/scout/tools/types";
 
 export type ScoutAgentAction =
   | "research_market"
@@ -24,7 +26,16 @@ export type RunScoutAgentInput = {
   goal: string;
 };
 
-export type ScoutAgentRun = {
+export type ScoutAgentPlanRun = {
   plan: ScoutAgentPlan;
   execution: ScoutAgentExecution;
 };
+
+export type ScoutAgentRun = {
+  goal: string;
+  decision: ScoutDecision;
+  tool_result?: ToolResult;
+  observation: string;
+};
+
+export type RunScoutLoopInput = RunScoutAgentInput;

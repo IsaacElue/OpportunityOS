@@ -5,7 +5,7 @@ import type {
   RunScoutAgentInput,
   ScoutAgentExecution,
   ScoutAgentPlan,
-  ScoutAgentRun
+  ScoutAgentPlanRun
 } from "@/lib/scout/agent/types";
 
 const plannedMessages: Record<ScoutAgentPlan["action"], string> = {
@@ -26,7 +26,7 @@ export function executeScoutPlan(plan: ScoutAgentPlan): ScoutAgentExecution {
 }
 
 /** Plan and mock-execute one Scout task using an existing brain context. */
-export async function runScoutAgent({ context, goal }: RunScoutAgentInput): Promise<ScoutAgentRun> {
+export async function runScoutAgent({ context, goal }: RunScoutAgentInput): Promise<ScoutAgentPlanRun> {
   const plan = await planScoutAction(context, goal);
   const execution = executeScoutPlan(plan);
 
