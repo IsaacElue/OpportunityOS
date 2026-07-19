@@ -9,6 +9,7 @@ export type {
   ScoutAgentExecution,
   ScoutAgentPlan,
   ScoutAgentPlanRun,
+  ScoutAgentStep,
   ScoutAgentRun,
   RunScoutLoopInput
 } from "@/lib/scout/agent/types";

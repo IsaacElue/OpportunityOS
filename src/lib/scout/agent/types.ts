@@ -31,10 +31,23 @@ export type ScoutAgentPlanRun = {
   execution: ScoutAgentExecution;
 };
 
+export type ScoutAgentStep = {
+  decision: ScoutDecision;
+  tool?: string;
+  result?: ToolResult;
+  observation: string;
+};
+
 export type ScoutAgentRun = {
   goal: string;
+  steps: ScoutAgentStep[];
+  final_response: string;
+  completed: boolean;
+  /** @deprecated Use steps for the complete multi-step agent trace. */
   decision: ScoutDecision;
+  /** @deprecated Use steps for the complete multi-step agent trace. */
   tool_result?: ToolResult;
+  /** @deprecated Use steps for the complete multi-step agent trace. */
   observation: string;
 };
 
