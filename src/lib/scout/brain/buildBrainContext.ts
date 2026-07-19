@@ -3,6 +3,7 @@ import "server-only";
 import { createScoutResearchContext } from "@/lib/scout/buildContext";
 import { getScoutFeedback } from "@/lib/scout/feedback/getFeedback";
 import { scoutIdentity } from "@/lib/scout/identity";
+import { getScoutObjectives } from "@/lib/scout/objectives/getObjectives";
 import type {
   BuildScoutBrainContextInput,
   ScoutBrainContext,
@@ -24,7 +25,7 @@ export function getScoutInstructions(): string {
   return [
     SCOUT_PERSONALITY_DESCRIPTION,
     "Be curious, analytical, concise, and founder-focused.",
-    "Ground conclusions in the supplied research context, memories, and feedback."
+    "Ground conclusions in the supplied research context, objectives, memories, and feedback."
   ].join("\n\n");
 }
 
@@ -33,9 +34,10 @@ export async function buildScoutBrainContext({
   organization_id,
   filters
 }: BuildScoutBrainContextInput): Promise<ScoutBrainContext> {
-  const [currentResearch, feedback] = await Promise.all([
+  const [currentResearch, feedback, objectives] = await Promise.all([
     createScoutResearchContext({ organization_id, filters }),
-    getScoutFeedback({ organization_id })
+    getScoutFeedback({ organization_id }),
+    getScoutObjectives({ organization_id, status: "active" })
   ]);
 
   return {
@@ -43,6 +45,7 @@ export async function buildScoutBrainContext({
     personality: getScoutPersonality(),
     memories: currentResearch.memories,
     feedback,
+    objectives,
     current_research: currentResearch,
     previous_scans: currentResearch.previous_scans
   };

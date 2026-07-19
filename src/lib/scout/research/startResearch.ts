@@ -67,6 +67,7 @@ export async function startScoutResearch({
       personality: getScoutPersonality(),
       memories: currentResearch.memories,
       feedback: [],
+      objectives: [],
       current_research: currentResearch,
       previous_scans: currentResearch.previous_scans
     };
