@@ -3,6 +3,7 @@ export { createScoutResearchContext } from "@/lib/scout/buildContext";
 export { executeScoutPlan, planScoutAction, runScoutAgent, runScoutLoop } from "@/lib/scout/agent";
 export {
   buildScoutBrainContext,
+  createScoutBrainContext,
   getScoutInstructions,
   getScoutPersonality
 } from "@/lib/scout/brain";

@@ -1,5 +1,6 @@
 export {
   buildScoutBrainContext,
+  createScoutBrainContext,
   getScoutInstructions,
   getScoutPersonality
 } from "@/lib/scout/brain/buildBrainContext";

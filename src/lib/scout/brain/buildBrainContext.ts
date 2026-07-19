@@ -47,3 +47,6 @@ export async function buildScoutBrainContext({
     previous_scans: currentResearch.previous_scans
   };
 }
+
+/** Alias for consumers that create Scout context before initiating an action. */
+export const createScoutBrainContext = buildScoutBrainContext;
