@@ -10,6 +10,7 @@ export {
 export { scoutIdentity } from "@/lib/scout/identity";
 export { getScoutFeedback, saveScoutFeedback } from "@/lib/scout/feedback";
 export { getScoutMemories, saveScoutMemory } from "@/lib/scout/memory";
+export { getScoutObjective, getScoutObjectives, saveScoutObjective } from "@/lib/scout/objectives";
 export { executeScoutTool, getAvailableTools } from "@/lib/scout/tools";
 export { reasonWithScout } from "@/lib/scout/intelligence";
 export { startScoutResearch, toScoutScanRequest } from "@/lib/scout/research";
@@ -65,6 +66,13 @@ export type {
   ScoutMemory,
   ScoutMemoryType
 } from "@/lib/scout/memory";
+export type {
+  GetScoutObjectiveInput,
+  GetScoutObjectivesInput,
+  SaveScoutObjectiveInput,
+  ScoutObjective,
+  ScoutObjectiveStatus
+} from "@/lib/scout/objectives";
 export type { ScoutTool, ToolResult } from "@/lib/scout/tools";
 export type { ReasonWithScoutInput, ScoutDecision } from "@/lib/scout/intelligence";
 export type {
