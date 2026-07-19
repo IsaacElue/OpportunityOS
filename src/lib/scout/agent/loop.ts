@@ -2,6 +2,7 @@ import "server-only";
 
 import { reasonWithScout } from "@/lib/scout/intelligence/reason";
 import { executeScoutTool } from "@/lib/scout/tools/executeTool";
+import { planScoutTool } from "@/lib/scout/toolPlanning/planTool";
 import type {
   RunScoutLoopInput,
   ScoutAgentStep,
@@ -60,20 +61,20 @@ export async function runScoutLoop({ context, goal }: RunScoutLoopInput): Promis
       goal: reasoningGoal(goal, steps)
     });
 
-    if (!decision.tool_needed) {
-      const observation = observationFor(undefined, decision.action);
+    const toolPlan = planScoutTool({
+      decision,
+      called_tools: steps.flatMap((step) => step.tool ? [step.tool] : [])
+    });
+
+    if (!toolPlan.next_tool) {
+      const observation = `${toolPlan.reason} ${observationFor(undefined, decision.action)}`;
       steps.push({ decision, observation });
-      return runResult(goal, steps, decision.reasoning, true);
+      return runResult(goal, steps, decision.reasoning, !decision.tool_needed);
     }
 
-    const tool = decision.suggested_tool;
-    const result: ToolResult = tool
-      ? await executeScoutTool(tool, { context, goal, decision })
-      : {
-          success: false,
-          message: "Scout requested a tool but did not specify one."
-        };
-    const observation = observationFor(result, decision.action);
+    const tool = toolPlan.next_tool;
+    const result: ToolResult = await executeScoutTool(tool, { context, goal, decision });
+    const observation = `${toolPlan.reason} ${observationFor(result, decision.action)}`;
     steps.push({ decision, ...(tool ? { tool } : {}), result, observation });
 
     if (!result.success) {
