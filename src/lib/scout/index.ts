@@ -1,5 +1,6 @@
 export { buildScoutContext } from "@/lib/scout/context";
 export { createScoutResearchContext } from "@/lib/scout/buildContext";
+export { executeScoutPlan, planScoutAction, runScoutAgent } from "@/lib/scout/agent";
 export {
   buildScoutBrainContext,
   getScoutInstructions,
@@ -27,6 +28,13 @@ export type {
 } from "@/lib/scout/types";
 export type { BuildScoutContextInput } from "@/lib/scout/context";
 export type { CreateScoutResearchContextInput } from "@/lib/scout/buildContext";
+export type {
+  RunScoutAgentInput,
+  ScoutAgentAction,
+  ScoutAgentExecution,
+  ScoutAgentPlan,
+  ScoutAgentRun
+} from "@/lib/scout/agent";
 export type {
   BuildScoutBrainContextInput,
   ScoutBrainContext,
