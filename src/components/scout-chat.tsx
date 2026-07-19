@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Loader2, Send } from "lucide-react";
+import Link from "next/link";
 
 import { ScoutAvatar } from "@/components/scout-avatar";
 import { TypingIndicator } from "@/components/typing-indicator";
@@ -17,6 +18,27 @@ type ScoutChatProps = {
   };
 };
 
+type ScoutChatRequest = {
+  message: string;
+  filters: {
+    industry: string;
+    buyer_type: string;
+    geography: string;
+    problem_hints: string[];
+  };
+};
+
+type ScoutChatResponse = {
+  message?: string;
+  action?: "research_started" | "conversation";
+  scanId?: string;
+  error?: { message?: string };
+};
+
+type ResearchStarted = {
+  scanId: string;
+};
+
 export function ScoutChat({ defaults }: ScoutChatProps) {
   const [industry, setIndustry] = useState(defaults.industry);
   const [buyerType, setBuyerType] = useState(defaults.buyerType);
@@ -24,43 +46,60 @@ export function ScoutChat({ defaults }: ScoutChatProps) {
   const [prompt, setPrompt] = useState("");
   const [context, setContext] = useState("");
   const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(null);
+  const [assistantMessage, setAssistantMessage] = useState<string | null>(null);
+  const [researchStarted, setResearchStarted] = useState<ResearchStarted | null>(null);
+  const [lastRequest, setLastRequest] = useState<ScoutChatRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const message = prompt.trim();
+    if (!message || submitting) return;
+
+    await sendMessage({
+      message,
+      filters: {
+        industry,
+        buyer_type: buyerType,
+        geography,
+        problem_hints: context.trim() ? [context.trim()] : []
+      }
+    });
+  }
+
+  async function sendMessage(request: ScoutChatRequest) {
+    if (submitting) return;
     setSubmitting(true);
     setError(null);
-    setSubmittedPrompt(prompt);
+    setSubmittedPrompt(request.message);
+    setAssistantMessage(null);
+    setResearchStarted(null);
+    setLastRequest(request);
 
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
     try {
-      const response = await fetch("/api/v1/scans", {
+      const response = await fetch("/api/v1/scout/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID()
-        },
-        body: JSON.stringify({
-          scope: {
-            industry,
-            buyer_type: buyerType,
-            geography,
-            problem_hints: [prompt, context].filter(Boolean)
-          }
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request)
       });
-      const data = await response.json().catch(() => null);
+      const data = await response.json().catch(() => null) as ScoutChatResponse | null;
       if (!response.ok) {
-        setError(data?.error?.message ?? "We could not create that research brief.");
-        setSubmitting(false);
+        setError(data?.error?.message ?? "Scout could not respond right now.");
         return;
       }
 
-      window.location.assign(`/app/scans/${data.id}`);
+      setAssistantMessage(data?.message ?? "I am ready to help with your research.");
+      if (data?.action === "research_started" && data.scanId) {
+        setResearchStarted({ scanId: data.scanId });
+      }
+      setPrompt("");
+      setContext("");
     } catch {
-      setError("We could not create that research brief.");
+      setError("Scout could not respond right now.");
+    } finally {
       setSubmitting(false);
     }
   }
@@ -93,11 +132,24 @@ export function ScoutChat({ defaults }: ScoutChatProps) {
         <ScoutAvatar size="sm" />
         <div className="max-w-xl rounded-2xl rounded-tl-sm border border-white/10 bg-black/15 p-4 text-sm leading-6 text-muted backdrop-blur">
           <p className="font-medium text-ink">Got it.</p>
-          <p className="mt-1">I&apos;m searching discussions across startup communities now.</p>
-          <p className="mt-1">I&apos;ll come back with evidence-backed opportunities.</p>
+          <p className="mt-1">I&apos;m thinking through the best next step.</p>
           <div className="mt-3"><TypingIndicator /></div>
         </div>
       </motion.div> : null}
+
+      {assistantMessage ? <div className="mt-4 flex items-start gap-3">
+        <ScoutAvatar size="sm" />
+        <div className="max-w-xl rounded-2xl rounded-tl-sm border border-white/10 bg-black/15 p-4 text-sm leading-6 text-muted backdrop-blur">
+          <p>{assistantMessage}</p>
+          {researchStarted ? <div className="mt-4 rounded-xl border border-brand/20 bg-brand/10 p-3">
+            <p className="font-medium text-brand">Scout is investigating...</p>
+            <p className="mt-1 text-xs text-muted">Research ID: {researchStarted.scanId}</p>
+            <Link href={`/app/scans/${researchStarted.scanId}`} className="mt-3 inline-flex text-sm font-medium text-brand hover:text-[#c2ffda]">
+              View investigation <ArrowRight className="ml-1 size-4" />
+            </Link>
+          </div> : null}
+        </div>
+      </div> : null}
 
       <Card className="mt-7 bg-black/15 p-4 backdrop-blur sm:p-5">
         <form onSubmit={submit}>
@@ -130,12 +182,17 @@ export function ScoutChat({ defaults }: ScoutChatProps) {
             />
           </label>
 
-          {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
+          {error ? <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-red-300">
+            <p>{error}</p>
+            {lastRequest ? <Button type="button" variant="secondary" size="sm" disabled={submitting} onClick={() => void sendMessage(lastRequest)}>
+              Retry
+            </Button> : null}
+          </div> : null}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <p className="flex items-center gap-2 text-xs text-muted"><Send className="size-3.5 text-brand" />Scout will turn this into a focused research brief.</p>
+            <p className="flex items-center gap-2 text-xs text-muted"><Send className="size-3.5 text-brand" />Scout will help decide the next research step.</p>
             <Button type="submit" size="lg" disabled={submitting}>
-              {submitting ? <><Loader2 className="size-4 animate-spin" />Starting investigation</> : <>Start Investigation <ArrowRight className="size-4" /></>}
+              {submitting ? <><Loader2 className="size-4 animate-spin" />Talking to Scout</> : <>Ask Scout <ArrowRight className="size-4" /></>}
             </Button>
           </div>
         </form>
