@@ -26,8 +26,8 @@ export function executeScoutPlan(plan: ScoutAgentPlan): ScoutAgentExecution {
 }
 
 /** Plan and mock-execute one Scout task using an existing brain context. */
-export function runScoutAgent({ context, goal }: RunScoutAgentInput): ScoutAgentRun {
-  const plan = planScoutAction(context, goal);
+export async function runScoutAgent({ context, goal }: RunScoutAgentInput): Promise<ScoutAgentRun> {
+  const plan = await planScoutAction(context, goal);
   const execution = executeScoutPlan(plan);
 
   return { plan, execution };
