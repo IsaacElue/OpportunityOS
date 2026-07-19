@@ -46,6 +46,11 @@ type SaveMemoryToolInput = {
   metadata?: unknown;
 };
 
+type ListOpportunitiesInput = {
+  organization_id?: unknown;
+  limit?: unknown;
+};
+
 const scoutMemoryTypes = new Set<ScoutMemoryType>([
   "preference",
   "rejection",
@@ -148,6 +153,27 @@ function memorySaveFailure(startedAt: number, message: string): ToolResult {
 
 function isMetadata(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toOpportunityLimit(value: unknown) {
+  const parsed = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() ? Number(value) : 10;
+  if (!Number.isFinite(parsed)) return 10;
+
+  return Math.min(Math.max(Math.floor(parsed), 1), 25);
+}
+
+function opportunityListFailure(startedAt: number): ToolResult {
+  return {
+    success: false,
+    message: "Scout could not list opportunities right now.",
+    data: {
+      opportunities: [],
+      count: 0,
+      execution_ms: durationSince(startedAt)
+    }
+  };
 }
 
 const evidenceSearchTool: ScoutTool = {
@@ -437,13 +463,53 @@ const saveMemoryTool: ScoutTool = {
   }
 };
 
+const listOpportunitiesTool: ScoutTool = {
+  name: "list_opportunities",
+  description: "List an organization's most recently discovered opportunities without modifying them.",
+  async execute(input) {
+    const startedAt = Date.now();
+    if (!input || typeof input !== "object") return opportunityListFailure(startedAt);
+
+    const request = input as ListOpportunitiesInput;
+    const organizationId = asText(request.organization_id);
+    if (!organizationId) return opportunityListFailure(startedAt);
+
+    try {
+      const supabase = createAdminClient();
+      const { data, error } = await supabase
+        .from("opportunities")
+        .select("id,title,problem,persona,industry,description,opportunity_score,pain_score,frequency_score,intent_score,market_score,competition_gap_score,confidence_score,created_at,scan_opportunities!inner(scans!inner(organization_id))")
+        .eq("scan_opportunities.scans.organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .limit(toOpportunityLimit(request.limit));
+      if (error) return opportunityListFailure(startedAt);
+
+      const opportunities = data ?? [];
+      return {
+        success: true,
+        message: opportunities.length === 0
+          ? "Scout found no opportunities yet."
+          : `Scout found ${opportunities.length} ${opportunities.length === 1 ? "opportunity" : "opportunities"}.`,
+        data: {
+          opportunities,
+          count: opportunities.length,
+          execution_ms: durationSince(startedAt)
+        }
+      };
+    } catch {
+      return opportunityListFailure(startedAt);
+    }
+  }
+};
+
 const registeredTools: ScoutTool[] = [
   evidenceSearchTool,
   opportunityAnalysisTool,
   createResearchTool,
   getReportTool,
   searchMemoryTool,
-  saveMemoryTool
+  saveMemoryTool,
+  listOpportunitiesTool
 ];
 
 /** Return the tools Scout can call now or in future runtime integrations. */
