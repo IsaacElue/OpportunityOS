@@ -5,6 +5,7 @@ import { fetchRedditEvidence } from "@/lib/ingestion/reddit";
 import type { EvidenceItem } from "@/lib/ingestion/types";
 import { extractOpportunity } from "@/lib/intelligence/extractor";
 import type { OpportunityExtraction } from "@/lib/intelligence/types";
+import { startScoutResearch } from "@/lib/scout/research/startResearch";
 import type { ScoutTool, ToolResult } from "@/lib/scout/tools/types";
 
 type EvidenceSearchInput = {
@@ -12,6 +13,14 @@ type EvidenceSearchInput = {
   geography?: unknown;
   buyer_type?: unknown;
   problem_hints?: unknown;
+};
+
+type CreateResearchInput = EvidenceSearchInput & {
+  goal?: unknown;
+  organizationId?: unknown;
+  organization_id?: unknown;
+  requestedBy?: unknown;
+  requested_by?: unknown;
 };
 
 function asText(value: unknown) {
@@ -61,6 +70,13 @@ function analysisFailure(startedAt: number): ToolResult {
       extracted_count: 0,
       execution_ms: durationSince(startedAt)
     }
+  };
+}
+
+function createResearchFailure(message: string): ToolResult {
+  return {
+    success: false,
+    message
   };
 }
 
@@ -155,7 +171,55 @@ const opportunityAnalysisTool: ScoutTool = {
   }
 };
 
-const registeredTools: ScoutTool[] = [evidenceSearchTool, opportunityAnalysisTool];
+const createResearchTool: ScoutTool = {
+  name: "create_research",
+  description: "Create a queued OpportunityOS research scan without executing it.",
+  async execute(input) {
+    if (!input || typeof input !== "object") {
+      return createResearchFailure("Scout research requires a goal and research filters.");
+    }
+
+    const request = input as CreateResearchInput;
+    const goal = asText(request.goal);
+    const organizationId = asText(request.organizationId) || asText(request.organization_id);
+    const requestedBy = asText(request.requestedBy) || asText(request.requested_by);
+    if (!goal) return createResearchFailure("Scout research requires a clear goal.");
+    if (!organizationId || !requestedBy) {
+      return createResearchFailure("Scout research requires trusted organization and requester identifiers.");
+    }
+
+    try {
+      const research = await startScoutResearch({
+        organizationId,
+        requestedBy,
+        goal,
+        filters: {
+          industry: asText(request.industry) || null,
+          geography: asText(request.geography) || null,
+          buyer_type: asText(request.buyer_type) || null,
+          problem_hints: Array.isArray(request.problem_hints)
+            ? request.problem_hints.map(asText).filter(Boolean).slice(0, 3)
+            : []
+        }
+      });
+
+      return {
+        success: true,
+        message: research.scoutMessage.content,
+        data: {
+          scan_id: research.scanId,
+          status: research.status,
+          scout_message: research.scoutMessage.content,
+          created_at: new Date().toISOString()
+        }
+      };
+    } catch {
+      return createResearchFailure("Scout could not create that research brief.");
+    }
+  }
+};
+
+const registeredTools: ScoutTool[] = [evidenceSearchTool, opportunityAnalysisTool, createResearchTool];
 
 /** Return the tools Scout can call now or in future runtime integrations. */
 export function getAvailableTools(): readonly ScoutTool[] {
