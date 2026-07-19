@@ -8,6 +8,10 @@ import type { OpportunityExtraction } from "@/lib/intelligence/types";
 import { getScoutMemories } from "@/lib/scout/memory/getMemory";
 import { saveScoutMemory } from "@/lib/scout/memory/saveMemory";
 import type { ScoutMemoryType } from "@/lib/scout/memory/types";
+import { getScoutObjectives } from "@/lib/scout/objectives/getObjectives";
+import { saveScoutObjective } from "@/lib/scout/objectives/saveObjective";
+import type { ScoutObjectiveStatus } from "@/lib/scout/objectives/types";
+import { updateScoutObjectiveStatus } from "@/lib/scout/objectives/updateObjectiveStatus";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { startScoutResearch } from "@/lib/scout/research/startResearch";
 import type { ScoutTool, ToolResult } from "@/lib/scout/tools/types";
@@ -51,12 +55,37 @@ type ListOpportunitiesInput = {
   limit?: unknown;
 };
 
+type CreateObjectiveInput = {
+  organization_id?: unknown;
+  user_id?: unknown;
+  title?: unknown;
+  goal?: unknown;
+  preferences?: unknown;
+};
+
+type ListObjectivesInput = {
+  organization_id?: unknown;
+  status?: unknown;
+};
+
+type UpdateObjectiveStatusToolInput = {
+  organization_id?: unknown;
+  objective_id?: unknown;
+  status?: unknown;
+};
+
 const scoutMemoryTypes = new Set<ScoutMemoryType>([
   "preference",
   "rejection",
   "interest",
   "goal",
   "feedback"
+]);
+
+const scoutObjectiveStatuses = new Set<ScoutObjectiveStatus>([
+  "active",
+  "paused",
+  "completed"
 ]);
 
 function asText(value: unknown) {
@@ -171,6 +200,17 @@ function opportunityListFailure(startedAt: number): ToolResult {
     data: {
       opportunities: [],
       count: 0,
+      execution_ms: durationSince(startedAt)
+    }
+  };
+}
+
+function objectiveToolFailure(startedAt: number, message: string, data: Record<string, unknown> = {}): ToolResult {
+  return {
+    success: false,
+    message,
+    data: {
+      ...data,
       execution_ms: durationSince(startedAt)
     }
   };
@@ -502,6 +542,149 @@ const listOpportunitiesTool: ScoutTool = {
   }
 };
 
+const createObjectiveTool: ScoutTool = {
+  name: "create_objective",
+  description: "Create a new organization-scoped long-running objective for Scout.",
+  async execute(input) {
+    const startedAt = Date.now();
+    if (!input || typeof input !== "object") {
+      return objectiveToolFailure(startedAt, "Scout objective creation requires organization and objective details.");
+    }
+
+    const request = input as CreateObjectiveInput;
+    const organizationId = asText(request.organization_id);
+    const userId = asText(request.user_id);
+    const title = asText(request.title);
+    const goal = asText(request.goal);
+    if (!organizationId || !userId || !title || !goal) {
+      return objectiveToolFailure(startedAt, "Scout objective creation requires organization, user, title, and goal details.");
+    }
+    if (request.preferences !== undefined && !isMetadata(request.preferences)) {
+      return objectiveToolFailure(startedAt, "Scout objective preferences must be an object.");
+    }
+
+    try {
+      const supabase = createAdminClient();
+      const { data: membership, error: membershipError } = await supabase
+        .from("organization_members")
+        .select("organization_id")
+        .eq("organization_id", organizationId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (membershipError || !membership) {
+        return objectiveToolFailure(startedAt, "Scout could not create that objective.");
+      }
+
+      const objective = await saveScoutObjective({
+        organization_id: organizationId,
+        created_by: userId,
+        title,
+        goal,
+        preferences: request.preferences
+      });
+      return {
+        success: true,
+        message: "Scout created that objective.",
+        data: {
+          objective,
+          created: true,
+          execution_ms: durationSince(startedAt)
+        }
+      };
+    } catch {
+      return objectiveToolFailure(startedAt, "Scout could not create that objective.");
+    }
+  }
+};
+
+const listObjectivesTool: ScoutTool = {
+  name: "list_objectives",
+  description: "List an organization's Scout objectives without modifying them.",
+  async execute(input) {
+    const startedAt = Date.now();
+    if (!input || typeof input !== "object") {
+      return objectiveToolFailure(startedAt, "Scout objective listing requires an organization identifier.", {
+        objectives: [],
+        count: 0
+      });
+    }
+
+    const request = input as ListObjectivesInput;
+    const organizationId = asText(request.organization_id);
+    const status = asText(request.status);
+    if (!organizationId || (status && !scoutObjectiveStatuses.has(status as ScoutObjectiveStatus))) {
+      return objectiveToolFailure(startedAt, "Scout objective listing requires a valid organization and optional status.", {
+        objectives: [],
+        count: 0
+      });
+    }
+
+    try {
+      const objectives = await getScoutObjectives({
+        organization_id: organizationId,
+        ...(status ? { status: status as ScoutObjectiveStatus } : {})
+      });
+      return {
+        success: true,
+        message: objectives.length === 0
+          ? "Scout found no objectives."
+          : `Scout found ${objectives.length} ${objectives.length === 1 ? "objective" : "objectives"}.`,
+        data: {
+          objectives,
+          count: objectives.length,
+          execution_ms: durationSince(startedAt)
+        }
+      };
+    } catch {
+      return objectiveToolFailure(startedAt, "Scout could not list objectives right now.", {
+        objectives: [],
+        count: 0
+      });
+    }
+  }
+};
+
+const updateObjectiveStatusTool: ScoutTool = {
+  name: "update_objective_status",
+  description: "Update only the status of an organization-scoped Scout objective.",
+  async execute(input) {
+    const startedAt = Date.now();
+    if (!input || typeof input !== "object") {
+      return objectiveToolFailure(startedAt, "Scout objective status updates require organization, objective, and status details.");
+    }
+
+    const request = input as UpdateObjectiveStatusToolInput;
+    const organizationId = asText(request.organization_id);
+    const objectiveId = asText(request.objective_id);
+    const status = asText(request.status);
+    if (!organizationId || !objectiveId || !scoutObjectiveStatuses.has(status as ScoutObjectiveStatus)) {
+      return objectiveToolFailure(startedAt, "Scout objective status updates require a valid organization, objective, and status.");
+    }
+
+    try {
+      const objective = await updateScoutObjectiveStatus({
+        organization_id: organizationId,
+        objective_id: objectiveId,
+        status: status as ScoutObjectiveStatus
+      });
+      if (!objective) {
+        return objectiveToolFailure(startedAt, "Scout could not find that objective.");
+      }
+
+      return {
+        success: true,
+        message: "Scout updated that objective's status.",
+        data: {
+          objective,
+          execution_ms: durationSince(startedAt)
+        }
+      };
+    } catch {
+      return objectiveToolFailure(startedAt, "Scout could not update that objective.");
+    }
+  }
+};
+
 const registeredTools: ScoutTool[] = [
   evidenceSearchTool,
   opportunityAnalysisTool,
@@ -509,7 +692,10 @@ const registeredTools: ScoutTool[] = [
   getReportTool,
   searchMemoryTool,
   saveMemoryTool,
-  listOpportunitiesTool
+  listOpportunitiesTool,
+  createObjectiveTool,
+  listObjectivesTool,
+  updateObjectiveStatusTool
 ];
 
 /** Return the tools Scout can call now or in future runtime integrations. */

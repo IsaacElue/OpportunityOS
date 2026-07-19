@@ -30,3 +30,7 @@ export type GetScoutObjectiveInput = {
   organization_id: string;
   objective_id: string;
 };
+
+export type UpdateScoutObjectiveStatusInput = GetScoutObjectiveInput & {
+  status: ScoutObjectiveStatus;
+};
