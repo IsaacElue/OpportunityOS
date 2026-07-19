@@ -1,5 +1,10 @@
 export { buildScoutContext } from "@/lib/scout/context";
 export { createScoutResearchContext } from "@/lib/scout/buildContext";
+export {
+  buildScoutBrainContext,
+  getScoutInstructions,
+  getScoutPersonality
+} from "@/lib/scout/brain";
 export { scoutIdentity } from "@/lib/scout/identity";
 export { getScoutFeedback, saveScoutFeedback } from "@/lib/scout/feedback";
 export { getScoutMemories, saveScoutMemory } from "@/lib/scout/memory";
@@ -22,6 +27,11 @@ export type {
 } from "@/lib/scout/types";
 export type { BuildScoutContextInput } from "@/lib/scout/context";
 export type { CreateScoutResearchContextInput } from "@/lib/scout/buildContext";
+export type {
+  BuildScoutBrainContextInput,
+  ScoutBrainContext,
+  ScoutPersonality
+} from "@/lib/scout/brain";
 export type {
   GetScoutFeedbackInput,
   SaveScoutFeedbackInput,
