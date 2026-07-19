@@ -11,6 +11,7 @@ export { getScoutFeedback, saveScoutFeedback } from "@/lib/scout/feedback";
 export { getScoutMemories, saveScoutMemory } from "@/lib/scout/memory";
 export { executeScoutTool, getAvailableTools } from "@/lib/scout/tools";
 export { reasonWithScout } from "@/lib/scout/intelligence";
+export { startScoutResearch, toScoutScanRequest } from "@/lib/scout/research";
 export {
   analyzingPatterns,
   evidenceFound,
@@ -58,3 +59,8 @@ export type {
 } from "@/lib/scout/memory";
 export type { ScoutTool, ToolResult } from "@/lib/scout/tools";
 export type { ReasonWithScoutInput, ScoutDecision } from "@/lib/scout/intelligence";
+export type {
+  ScoutScanRequest,
+  StartScoutResearchInput,
+  StartScoutResearchResult
+} from "@/lib/scout/research";
