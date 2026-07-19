@@ -5,6 +5,7 @@ import { fetchRedditEvidence } from "@/lib/ingestion/reddit";
 import type { EvidenceItem } from "@/lib/ingestion/types";
 import { extractOpportunity } from "@/lib/intelligence/extractor";
 import type { OpportunityExtraction } from "@/lib/intelligence/types";
+import { getScoutMemories } from "@/lib/scout/memory/getMemory";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { startScoutResearch } from "@/lib/scout/research/startResearch";
 import type { ScoutTool, ToolResult } from "@/lib/scout/tools/types";
@@ -27,6 +28,11 @@ type CreateResearchInput = EvidenceSearchInput & {
 type GetReportInput = {
   report_id?: unknown;
   organizationId?: unknown;
+  organization_id?: unknown;
+};
+
+type SearchMemoryInput = {
+  query?: unknown;
   organization_id?: unknown;
 };
 
@@ -94,6 +100,18 @@ function reportFailure(startedAt: number, message: string): ToolResult {
     data: {
       report: null,
       found: false,
+      execution_ms: durationSince(startedAt)
+    }
+  };
+}
+
+function memorySearchFailure(startedAt: number, message: string): ToolResult {
+  return {
+    success: false,
+    message,
+    data: {
+      memories: [],
+      count: 0,
       execution_ms: durationSince(startedAt)
     }
   };
@@ -287,7 +305,50 @@ const getReportTool: ScoutTool = {
   }
 };
 
-const registeredTools: ScoutTool[] = [evidenceSearchTool, opportunityAnalysisTool, createResearchTool, getReportTool];
+const searchMemoryTool: ScoutTool = {
+  name: "search_memory",
+  description: "Search an organization's Scout memories without modifying them.",
+  async execute(input) {
+    const startedAt = Date.now();
+    if (!input || typeof input !== "object") {
+      return memorySearchFailure(startedAt, "Scout memory search requires a query and organization identifier.");
+    }
+
+    const request = input as SearchMemoryInput;
+    const query = asText(request.query).toLowerCase();
+    const organizationId = asText(request.organization_id);
+    if (!query || !organizationId) {
+      return memorySearchFailure(startedAt, "Scout memory search requires a query and organization identifier.");
+    }
+
+    try {
+      const memories = await getScoutMemories({ organization_id: organizationId });
+      const matchingMemories = memories.filter((memory) => memory.content.toLowerCase().includes(query));
+
+      return {
+        success: true,
+        message: matchingMemories.length === 0
+          ? "Scout found no matching memories."
+          : `Scout found ${matchingMemories.length} matching ${matchingMemories.length === 1 ? "memory" : "memories"}.`,
+        data: {
+          memories: matchingMemories,
+          count: matchingMemories.length,
+          execution_ms: durationSince(startedAt)
+        }
+      };
+    } catch {
+      return memorySearchFailure(startedAt, "Scout could not search memories right now.");
+    }
+  }
+};
+
+const registeredTools: ScoutTool[] = [
+  evidenceSearchTool,
+  opportunityAnalysisTool,
+  createResearchTool,
+  getReportTool,
+  searchMemoryTool
+];
 
 /** Return the tools Scout can call now or in future runtime integrations. */
 export function getAvailableTools(): readonly ScoutTool[] {
