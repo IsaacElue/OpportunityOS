@@ -5,6 +5,7 @@ import { fetchRedditEvidence } from "@/lib/ingestion/reddit";
 import type { EvidenceItem } from "@/lib/ingestion/types";
 import { extractOpportunity } from "@/lib/intelligence/extractor";
 import type { OpportunityExtraction } from "@/lib/intelligence/types";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { startScoutResearch } from "@/lib/scout/research/startResearch";
 import type { ScoutTool, ToolResult } from "@/lib/scout/tools/types";
 
@@ -21,6 +22,12 @@ type CreateResearchInput = EvidenceSearchInput & {
   organization_id?: unknown;
   requestedBy?: unknown;
   requested_by?: unknown;
+};
+
+type GetReportInput = {
+  report_id?: unknown;
+  organizationId?: unknown;
+  organization_id?: unknown;
 };
 
 function asText(value: unknown) {
@@ -77,6 +84,18 @@ function createResearchFailure(message: string): ToolResult {
   return {
     success: false,
     message
+  };
+}
+
+function reportFailure(startedAt: number, message: string): ToolResult {
+  return {
+    success: false,
+    message,
+    data: {
+      report: null,
+      found: false,
+      execution_ms: durationSince(startedAt)
+    }
   };
 }
 
@@ -219,7 +238,56 @@ const createResearchTool: ScoutTool = {
   }
 };
 
-const registeredTools: ScoutTool[] = [evidenceSearchTool, opportunityAnalysisTool, createResearchTool];
+const getReportTool: ScoutTool = {
+  name: "get_report",
+  description: "Retrieve one completed Founder Opportunity Report for a trusted organization.",
+  async execute(input) {
+    const startedAt = Date.now();
+    if (!input || typeof input !== "object") {
+      return reportFailure(startedAt, "Scout report lookup requires a report identifier.");
+    }
+
+    const request = input as GetReportInput;
+    const reportId = asText(request.report_id);
+    const organizationId = asText(request.organizationId) || asText(request.organization_id);
+    if (!reportId || !organizationId) {
+      return reportFailure(startedAt, "Scout report lookup requires trusted report and organization identifiers.");
+    }
+
+    try {
+      const supabase = createAdminClient();
+      const { data: report, error: reportError } = await supabase
+        .from("opportunity_reports")
+        .select("id,opportunity_id,problem,evidence_summary,buyer_profile,existing_workarounds,ai_advantage,mvp_suggestion,validation_experiment,confidence_score,created_at,updated_at")
+        .eq("id", reportId)
+        .maybeSingle();
+      if (reportError || !report) return reportFailure(startedAt, "Scout could not find that report.");
+
+      const { data: scanLink, error: ownershipError } = await supabase
+        .from("scan_opportunities")
+        .select("scan_id,scans!inner(organization_id)")
+        .eq("opportunity_id", report.opportunity_id)
+        .eq("scans.organization_id", organizationId)
+        .limit(1)
+        .maybeSingle();
+      if (ownershipError || !scanLink) return reportFailure(startedAt, "Scout could not find that report.");
+
+      return {
+        success: true,
+        message: "Scout retrieved the requested report.",
+        data: {
+          report,
+          found: true,
+          execution_ms: durationSince(startedAt)
+        }
+      };
+    } catch {
+      return reportFailure(startedAt, "Scout could not retrieve that report.");
+    }
+  }
+};
+
+const registeredTools: ScoutTool[] = [evidenceSearchTool, opportunityAnalysisTool, createResearchTool, getReportTool];
 
 /** Return the tools Scout can call now or in future runtime integrations. */
 export function getAvailableTools(): readonly ScoutTool[] {
