@@ -3,15 +3,9 @@ import "server-only";
 import { fetchHackerNewsEvidence } from "@/lib/ingestion/hackernews";
 import { fetchRedditEvidence } from "@/lib/ingestion/reddit";
 import type { EvidenceItem } from "@/lib/ingestion/types";
+import { extractOpportunity } from "@/lib/intelligence/extractor";
+import type { OpportunityExtraction } from "@/lib/intelligence/types";
 import type { ScoutTool, ToolResult } from "@/lib/scout/tools/types";
-
-function mockResult(message: string): ToolResult {
-  return {
-    success: true,
-    message,
-    data: { status: "mock" }
-  };
-}
 
 type EvidenceSearchInput = {
   industry?: unknown;
@@ -42,6 +36,32 @@ function buildEvidenceQuery(input: unknown) {
 
 function durationSince(startedAt: number) {
   return Date.now() - startedAt;
+}
+
+function isEvidenceItem(value: unknown): value is EvidenceItem {
+  if (!value || typeof value !== "object") return false;
+
+  const evidence = value as Partial<EvidenceItem>;
+  return typeof evidence.title === "string"
+    && typeof evidence.content === "string"
+    && typeof evidence.sourceType === "string"
+    && typeof evidence.platform === "string"
+    && (evidence.url === undefined || typeof evidence.url === "string")
+    && (evidence.author === undefined || typeof evidence.author === "string")
+    && (evidence.engagementScore === undefined || typeof evidence.engagementScore === "number")
+    && (evidence.publishedAt === undefined || evidence.publishedAt instanceof Date);
+}
+
+function analysisFailure(startedAt: number): ToolResult {
+  return {
+    success: false,
+    message: "Opportunity analysis could not be completed.",
+    data: {
+      opportunities: [],
+      extracted_count: 0,
+      execution_ms: durationSince(startedAt)
+    }
+  };
 }
 
 const evidenceSearchTool: ScoutTool = {
@@ -108,9 +128,30 @@ const evidenceSearchTool: ScoutTool = {
 
 const opportunityAnalysisTool: ScoutTool = {
   name: "opportunity_analysis",
-  description: "Analyze, score, compare, and validate future opportunity data.",
-  async execute() {
-    return mockResult("Opportunity analysis tool ready");
+  description: "Extract evidence-supported opportunities without persisting, scoring, or deduplicating them.",
+  async execute(input) {
+    const startedAt = Date.now();
+    const evidence = input && typeof input === "object" && Array.isArray((input as { evidence?: unknown }).evidence)
+      ? (input as { evidence: unknown[] }).evidence
+      : null;
+    if (!evidence || !evidence.every(isEvidenceItem)) return analysisFailure(startedAt);
+
+    try {
+      const extracted = await Promise.all(evidence.map((item) => extractOpportunity(item)));
+      const opportunities: OpportunityExtraction[] = extracted.flatMap((opportunity) => opportunity ? [opportunity] : []);
+
+      return {
+        success: true,
+        message: `Extracted ${opportunities.length} ${opportunities.length === 1 ? "opportunity" : "opportunities"}.`,
+        data: {
+          opportunities,
+          extracted_count: opportunities.length,
+          execution_ms: durationSince(startedAt)
+        }
+      };
+    } catch {
+      return analysisFailure(startedAt);
+    }
   }
 };
 
