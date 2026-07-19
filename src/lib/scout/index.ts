@@ -9,6 +9,7 @@ export {
 export { scoutIdentity } from "@/lib/scout/identity";
 export { getScoutFeedback, saveScoutFeedback } from "@/lib/scout/feedback";
 export { getScoutMemories, saveScoutMemory } from "@/lib/scout/memory";
+export { executeScoutTool, getAvailableTools } from "@/lib/scout/tools";
 export {
   analyzingPatterns,
   evidenceFound,
@@ -52,3 +53,4 @@ export type {
   ScoutMemory,
   ScoutMemoryType
 } from "@/lib/scout/memory";
+export type { ScoutTool, ToolResult } from "@/lib/scout/tools";
