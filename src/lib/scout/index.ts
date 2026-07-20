@@ -12,6 +12,7 @@ export { getScoutFeedback, saveScoutFeedback } from "@/lib/scout/feedback";
 export { createScoutExecution, getScoutExecutions, updateScoutExecutionStatus } from "@/lib/scout/executions";
 export { getScoutMemories, saveScoutMemory } from "@/lib/scout/memory";
 export { getScoutObjective, getScoutObjectives, saveScoutObjective } from "@/lib/scout/objectives";
+export { createScoutSchedule, getDueScoutSchedules, updateScoutSchedule } from "@/lib/scout/schedules";
 export { executeScoutTool, getAvailableTools } from "@/lib/scout/tools";
 export { planScoutTool } from "@/lib/scout/toolPlanning";
 export { reasonWithScout } from "@/lib/scout/intelligence";
@@ -82,6 +83,13 @@ export type {
   ScoutObjective,
   ScoutObjectiveStatus
 } from "@/lib/scout/objectives";
+export type {
+  CreateScoutScheduleInput,
+  GetDueScoutSchedulesInput,
+  ScoutSchedule,
+  ScoutScheduleFrequency,
+  UpdateScoutScheduleInput
+} from "@/lib/scout/schedules";
 export type { ScoutTool, ToolResult } from "@/lib/scout/tools";
 export type { PlanScoutToolInput, ScoutToolPlan } from "@/lib/scout/toolPlanning";
 export type { ReasonWithScoutInput, ScoutDecision } from "@/lib/scout/intelligence";
