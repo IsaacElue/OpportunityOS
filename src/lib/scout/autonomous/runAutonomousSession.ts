@@ -2,6 +2,8 @@ import "server-only";
 
 import { runScoutLoop } from "@/lib/scout/agent/loop";
 import { buildScoutBrainContext } from "@/lib/scout/brain/buildBrainContext";
+import { createScoutExecution } from "@/lib/scout/executions/createExecution";
+import { updateScoutExecutionStatus } from "@/lib/scout/executions/updateExecutionStatus";
 import { getScoutObjectives } from "@/lib/scout/objectives/getObjectives";
 import type { ScoutObjective } from "@/lib/scout/objectives/types";
 import type {
@@ -52,12 +54,19 @@ function summary(
   };
 }
 
-/** Run one bounded Scout session for the next active objective without persisting execution history. */
+function persistedSummary(finalResponse: string) {
+  return {
+    final_response: finalResponse.slice(0, 4_000)
+  };
+}
+
+/** Run one bounded Scout session for the next active objective and persist only execution metadata. */
 export async function runScoutAutonomousSession({
   organization_id
 }: RunScoutAutonomousSessionInput): Promise<ScoutAutonomousExecutionSummary> {
   const startedAt = new Date().toISOString();
   let objective: ScoutObjective | undefined;
+  let executionId: string | undefined;
 
   try {
     const objectives = await getScoutObjectives({ organization_id, status: "active" });
@@ -65,6 +74,13 @@ export async function runScoutAutonomousSession({
     if (!objective) {
       return summary(startedAt, "no_active_objective", "Scout found no active objectives to work on.");
     }
+
+    const execution = await createScoutExecution({
+      organization_id,
+      objective_id: objective.id,
+      started_at: startedAt
+    });
+    executionId = execution.id;
 
     const context = await buildScoutBrainContext({
       organization_id,
@@ -74,6 +90,18 @@ export async function runScoutAutonomousSession({
       context,
       goal: `Objective: ${objective.title}\n\n${objective.goal}`
     });
+    const completedAt = new Date().toISOString();
+    const status = agentRun.completed ? "completed" : "failed";
+    const savedExecution = await updateScoutExecutionStatus({
+      organization_id,
+      execution_id: execution.id,
+      status,
+      completed_at: completedAt,
+      summary: persistedSummary(agentRun.final_response),
+      steps_completed: agentRun.steps.length,
+      tools_used: agentRun.steps.flatMap((step) => step.tool ? [step.tool] : [])
+    });
+    if (!savedExecution) throw new Error("Scout execution record could not be finalized.");
 
     return {
       objective_id: objective.id,
@@ -83,9 +111,25 @@ export async function runScoutAutonomousSession({
       tools_used: agentRun.steps.flatMap((step) => step.tool ? [step.tool] : []),
       final_response: agentRun.final_response,
       started_at: startedAt,
-      completed_at: new Date().toISOString()
+      completed_at: completedAt
     };
   } catch {
+    if (executionId) {
+      try {
+        await updateScoutExecutionStatus({
+          organization_id,
+          execution_id: executionId,
+          status: "failed",
+          completed_at: new Date().toISOString(),
+          summary: persistedSummary("Scout could not complete the autonomous objective session."),
+          steps_completed: 0,
+          tools_used: []
+        });
+      } catch {
+        // Preserve the existing response shape even when persistence recovery is unavailable.
+      }
+    }
+
     return summary(
       startedAt,
       "failed",
