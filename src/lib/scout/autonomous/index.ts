@@ -2,5 +2,6 @@ export { runScoutAutonomousSession } from "@/lib/scout/autonomous/runAutonomousS
 export type {
   RunScoutAutonomousSessionInput,
   ScoutAutonomousExecutionStatus,
-  ScoutAutonomousExecutionSummary
+  ScoutAutonomousExecutionSummary,
+  ScoutObjectiveStatusChange
 } from "@/lib/scout/autonomous/types";

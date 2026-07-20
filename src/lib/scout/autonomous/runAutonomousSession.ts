@@ -5,12 +5,15 @@ import { buildScoutBrainContext } from "@/lib/scout/brain/buildBrainContext";
 import { createScoutExecution } from "@/lib/scout/executions/createExecution";
 import { updateScoutExecutionStatus } from "@/lib/scout/executions/updateExecutionStatus";
 import { getScoutObjective, getScoutObjectives } from "@/lib/scout/objectives/getObjectives";
-import type { ScoutObjective } from "@/lib/scout/objectives/types";
+import { updateScoutObjectiveStatus } from "@/lib/scout/objectives/updateObjectiveStatus";
+import type { ScoutObjective, ScoutObjectiveStatus } from "@/lib/scout/objectives/types";
 import type {
   RunScoutAutonomousSessionInput,
   ScoutAutonomousExecutionStatus,
-  ScoutAutonomousExecutionSummary
+  ScoutAutonomousExecutionSummary,
+  ScoutObjectiveStatusChange
 } from "@/lib/scout/autonomous/types";
+import type { ScoutAgentRun } from "@/lib/scout/agent/types";
 import type { ScoutScanFilters } from "@/lib/scout/types";
 
 function asText(value: unknown): string | null {
@@ -49,6 +52,7 @@ function summary(
     steps_completed: 0,
     tools_used: [],
     final_response: finalResponse,
+    objective_status_change: null,
     started_at: startedAt,
     completed_at: new Date().toISOString()
   };
@@ -58,6 +62,56 @@ function persistedSummary(finalResponse: string) {
   return {
     final_response: finalResponse.slice(0, 4_000)
   };
+}
+
+function hasProducedOpportunities(agentRun: ScoutAgentRun) {
+  return agentRun.steps.some((step) => {
+    if (!step.result?.success || !step.result.data || typeof step.result.data !== "object") return false;
+
+    const opportunities = (step.result.data as { opportunities?: unknown }).opportunities;
+    return Array.isArray(opportunities) && opportunities.length > 0;
+  });
+}
+
+function isExplicitOneTimeResearchObjective(objective: ScoutObjective) {
+  const preferences = objective.preferences;
+  if (preferences.one_time === true || preferences.task_type === "one_time_research") return true;
+
+  const objectiveText = `${objective.title}\n${objective.goal}`;
+  return /\b(one[- ]?time|one[- ]?off|once)\b/i.test(objectiveText)
+    && /\b(research|investigat(?:e|ion))\b/i.test(objectiveText);
+}
+
+function nextObjectiveStatus(objective: ScoutObjective, agentRun: ScoutAgentRun): ScoutObjectiveStatus {
+  if (!agentRun.completed) return objective.status;
+  if (isExplicitOneTimeResearchObjective(objective)) return "completed";
+  if (hasProducedOpportunities(agentRun)) return "active";
+  return "active";
+}
+
+async function updateObjectiveLifecycle(
+  organizationId: string,
+  objective: ScoutObjective,
+  agentRun: ScoutAgentRun
+): Promise<ScoutObjectiveStatusChange | null> {
+  const status = nextObjectiveStatus(objective, agentRun);
+  if (status === objective.status) return null;
+
+  try {
+    const updatedObjective = await updateScoutObjectiveStatus({
+      organization_id: organizationId,
+      objective_id: objective.id,
+      status
+    });
+    if (!updatedObjective) return null;
+
+    return {
+      previous_status: objective.status,
+      current_status: updatedObjective.status
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Run one bounded Scout session for the next active objective and persist only execution metadata. */
@@ -108,6 +162,7 @@ export async function runScoutAutonomousSession({
       tools_used: agentRun.steps.flatMap((step) => step.tool ? [step.tool] : [])
     });
     if (!savedExecution) throw new Error("Scout execution record could not be finalized.");
+    const objectiveStatusChange = await updateObjectiveLifecycle(organization_id, objective, agentRun);
 
     return {
       objective_id: objective.id,
@@ -116,6 +171,7 @@ export async function runScoutAutonomousSession({
       steps_completed: agentRun.steps.length,
       tools_used: agentRun.steps.flatMap((step) => step.tool ? [step.tool] : []),
       final_response: agentRun.final_response,
+      objective_status_change: objectiveStatusChange,
       started_at: startedAt,
       completed_at: completedAt
     };

@@ -1,4 +1,11 @@
+import type { ScoutObjectiveStatus } from "@/lib/scout/objectives/types";
+
 export type ScoutAutonomousExecutionStatus = "completed" | "stopped" | "no_active_objective" | "failed";
+
+export type ScoutObjectiveStatusChange = {
+  previous_status: ScoutObjectiveStatus;
+  current_status: ScoutObjectiveStatus;
+};
 
 export type ScoutAutonomousExecutionSummary = {
   objective_id: string | null;
@@ -7,6 +14,7 @@ export type ScoutAutonomousExecutionSummary = {
   steps_completed: number;
   tools_used: string[];
   final_response: string;
+  objective_status_change: ScoutObjectiveStatusChange | null;
   started_at: string;
   completed_at: string;
 };
