@@ -33,3 +33,13 @@ export type GetDueScoutSchedulesInput = {
   organization_id: string;
   due_at?: string;
 };
+
+export type RunScheduledScoutSessionsInput = GetDueScoutSchedulesInput;
+
+export type ScoutScheduledSessionsResult = {
+  total_due: number;
+  executed: number;
+  skipped: number;
+  failed: number;
+  execution_summaries: import("@/lib/scout/autonomous/types").ScoutAutonomousExecutionSummary[];
+};

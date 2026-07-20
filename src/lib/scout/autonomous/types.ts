@@ -13,4 +13,5 @@ export type ScoutAutonomousExecutionSummary = {
 
 export type RunScoutAutonomousSessionInput = {
   organization_id: string;
+  objective_id?: string;
 };

@@ -4,7 +4,7 @@ import { runScoutLoop } from "@/lib/scout/agent/loop";
 import { buildScoutBrainContext } from "@/lib/scout/brain/buildBrainContext";
 import { createScoutExecution } from "@/lib/scout/executions/createExecution";
 import { updateScoutExecutionStatus } from "@/lib/scout/executions/updateExecutionStatus";
-import { getScoutObjectives } from "@/lib/scout/objectives/getObjectives";
+import { getScoutObjective, getScoutObjectives } from "@/lib/scout/objectives/getObjectives";
 import type { ScoutObjective } from "@/lib/scout/objectives/types";
 import type {
   RunScoutAutonomousSessionInput,
@@ -62,15 +62,21 @@ function persistedSummary(finalResponse: string) {
 
 /** Run one bounded Scout session for the next active objective and persist only execution metadata. */
 export async function runScoutAutonomousSession({
-  organization_id
+  organization_id,
+  objective_id
 }: RunScoutAutonomousSessionInput): Promise<ScoutAutonomousExecutionSummary> {
   const startedAt = new Date().toISOString();
   let objective: ScoutObjective | undefined;
   let executionId: string | undefined;
 
   try {
-    const objectives = await getScoutObjectives({ organization_id, status: "active" });
-    objective = objectives[0];
+    if (objective_id) {
+      objective = await getScoutObjective({ organization_id, objective_id }) ?? undefined;
+      if (objective?.status !== "active") objective = undefined;
+    } else {
+      const objectives = await getScoutObjectives({ organization_id, status: "active" });
+      objective = objectives[0];
+    }
     if (!objective) {
       return summary(startedAt, "no_active_objective", "Scout found no active objectives to work on.");
     }
