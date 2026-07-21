@@ -6,6 +6,8 @@ import { getScoutExecutions } from "@/lib/scout/executions";
 import { getScoutFeedback } from "@/lib/scout/feedback";
 import { getScoutMemories } from "@/lib/scout/memory";
 import { getScoutObjectives } from "@/lib/scout/objectives";
+import { createScoutBrainContext } from "@/lib/scout/brain";
+import { generateScoutBriefing } from "@/lib/scout/briefing";
 import { createClient } from "@/lib/supabase/server";
 
 type ScanRow = {
@@ -82,6 +84,20 @@ export default async function ScoutPage() {
     activity
   };
   const preferences = preferencesResult.data;
+  let briefing = null;
+  try {
+    const context = await createScoutBrainContext({
+      organization_id: organizationId,
+      filters: {
+        industry: preferences?.industries?.[0] ?? null,
+        buyer_type: preferences?.buyer_types?.[0] ?? null,
+        geography: preferences?.geography ?? null
+      }
+    });
+    briefing = generateScoutBriefing({ context, recent_executions: executions });
+  } catch {
+    briefing = null;
+  }
 
   return <ScoutWorkspace
     conversations={conversations.map((conversation) => ({ id: conversation.id, title: conversation.title, updatedAt: conversation.updated_at, preview: conversationMessages[conversation.id]?.at(-1)?.content ?? null }))}
@@ -91,5 +107,6 @@ export default async function ScoutPage() {
     conversationMessages={conversationMessages}
     defaults={{ industry: preferences?.industries?.[0] ?? "General market", buyerType: preferences?.buyer_types?.[0] ?? "Founder", geography: preferences?.geography ?? "Global" }}
     status={status}
+    briefing={briefing}
   />;
 }

@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, CircleAlert, Loader2, Send, Sparkles } from "lucide-react";
 
 import { ScoutAvatar } from "@/components/scout-avatar";
+import { ScoutBriefingCard } from "@/components/scout-briefing-card";
 import { ScoutConversationSidebar, type ScoutConversationListItem } from "@/components/scout-conversation-sidebar";
 import { ScoutMessageAnimation } from "@/components/scout-message-animation";
 import { ScoutPageTransition } from "@/components/scout-page-transition";
@@ -12,6 +13,7 @@ import { ScoutThinkingAnimation } from "@/components/scout-thinking-animation";
 import { ScoutWorkspaceStatus, type ScoutWorkspaceStatusData } from "@/components/scout-workspace-status";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import type { ScoutBriefing } from "@/lib/scout/briefing";
 
 type WorkspaceMessage = { id: string; role: "user" | "assistant"; content: string; createdAt: string };
 type ScoutWorkspaceProps = {
@@ -22,6 +24,7 @@ type ScoutWorkspaceProps = {
   conversationMessages: Record<string, WorkspaceMessage[]>;
   defaults: { industry: string; buyerType: string; geography: string };
   status: ScoutWorkspaceStatusData;
+  briefing: ScoutBriefing | null;
 };
 type ScoutChatResponse = { message?: string; action?: "research_started" | "conversation"; scanId?: string; conversationId?: string; error?: { message?: string } };
 type ResearchStarted = { scanId: string };
@@ -29,7 +32,7 @@ type ResearchStarted = { scanId: string };
 const suggestions = ["Find overlooked problems in this market.", "What founder pain is repeating right now?", "Compare the strongest opportunities Scout has found."];
 const activeConversationKey = "opportunityos:scout:active-conversation";
 
-export function ScoutWorkspace({ conversations, initialConversationId, initialConversationTitle, initialMessages, conversationMessages, defaults, status }: ScoutWorkspaceProps) {
+export function ScoutWorkspace({ conversations, initialConversationId, initialConversationTitle, initialMessages, conversationMessages, defaults, status, briefing }: ScoutWorkspaceProps) {
   const [conversationList, setConversationList] = useState(conversations);
   const [histories, setHistories] = useState(conversationMessages);
   const [conversationId, setConversationId] = useState<string | null>(initialConversationId);
@@ -162,6 +165,7 @@ export function ScoutWorkspace({ conversations, initialConversationId, initialCo
     <main className="flex min-h-[38rem] min-w-0 flex-col bg-gradient-to-b from-[#101923] to-surface">
       <header className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6"><div className="min-w-0"><p className="text-xs font-medium uppercase tracking-[0.16em] text-brand">Scout conversation</p><h1 className="mt-1 truncate text-lg font-semibold">{conversationTitle}</h1></div><span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-brand/20 bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand"><span className="size-1.5 rounded-full bg-brand" />Online</span></header>
       <div ref={viewportRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6">
+        <ScoutBriefingCard briefing={briefing} className="mb-6" />
         {messages.length === 0 ? <Welcome onSuggestion={setPrompt} /> : <div className="space-y-5">{messages.map((message, index) => <ScoutMessageAnimation key={message.id} index={index}><MessageBubble message={message} /></ScoutMessageAnimation>)}</div>}
         {submitting ? <ScoutThinkingAnimation state="thinking" className="mt-5" /> : null}
         {researchStarted ? <Card className="mt-5 max-w-xl border-brand/20 bg-brand/[0.06] p-4 transition-colors"><div className="flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand/15 text-brand"><Sparkles className="size-4" /></span><div className="min-w-0"><p className="font-medium">Scout has started investigating.</p><p className="mt-1 text-sm text-muted">Research ID: {researchStarted.scanId}</p><p className="mt-1 text-xs text-muted">Status: queued · Evidence collection will begin shortly.</p><Link href={`/app/scans/${researchStarted.scanId}`} className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand hover:text-[#c2ffda]">Open Investigation <ArrowUpRight className="size-4" /></Link></div></div></Card> : null}
