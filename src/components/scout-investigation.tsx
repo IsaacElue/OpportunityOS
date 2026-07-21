@@ -6,6 +6,7 @@ import { Check, Circle, Loader2, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { ScoutAvatar } from "@/components/scout-avatar";
+import { ScoutTimelineMotion } from "@/components/scout-timeline-motion";
 import { TypingIndicator } from "@/components/typing-indicator";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -170,11 +171,7 @@ export function ScoutInvestigation({ progress, scanId, createdAt, children }: Sc
                 ? "Earlier"
                 : "Upcoming";
 
-          return <motion.li
-            key={item.id}
-            layout
-            className={"relative flex gap-3 rounded-xl px-2 py-3 transition-colors " + (isFuture ? "opacity-45" : "")}
-          >
+          return <ScoutTimelineMotion key={item.id} index={index} isActive={isActive} isComplete={isDone} className={isFuture ? "opacity-45" : ""}>
             {index < timeline.length - 1 ? <span className={"absolute bottom-0 left-[1.15rem] top-9 w-px " + (isDone ? "bg-brand/50" : "bg-white/10")} /> : null}
             <span className={"relative z-10 grid size-7 shrink-0 place-items-center rounded-full border " + (isDone ? "border-brand/30 bg-brand text-brand-ink" : isActive ? "border-brand/40 bg-brand/10 text-brand" : "border-white/10 bg-white/[0.04] text-muted")}>
               {isDone ? <Check className="size-4" /> : isActive ? <Loader2 className="size-4 animate-spin" /> : <Circle className="size-3" />}
@@ -186,7 +183,7 @@ export function ScoutInvestigation({ progress, scanId, createdAt, children }: Sc
               </div>
               {isActive ? <p className="mt-1 flex items-center gap-1.5 text-sm text-brand"><Search className="size-3.5 animate-pulse" />{progress?.progressMessage ?? "Working through the evidence"}</p> : null}
             </div>
-          </motion.li>;
+          </ScoutTimelineMotion>;
         })}
       </ol>
     </Card>
