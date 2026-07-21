@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
-import { Bookmark, Compass, Loader2, LogOut, Plus, type LucideIcon } from "lucide-react";
+import { Bookmark, Bot, Compass, Loader2, LogOut, Plus, type LucideIcon } from "lucide-react";
 
 import { Brand } from "@/components/brand";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useState } from "react";
 import { authErrorMessage } from "@/lib/errors";
 
 const navigation: Array<{ href: Route; label: string; icon: LucideIcon }> = [
+  { href: "/app/scout" as Route, label: "Scout", icon: Bot },
   { href: "/app/scan", label: "New research", icon: Plus },
   { href: "/app/reports/placeholder", label: "Reports", icon: Compass },
   { href: "/app/saved", label: "Saved", icon: Bookmark }
