@@ -1,4 +1,5 @@
 export { buildScoutContext } from "@/lib/scout/context";
+export { generateScoutBriefing } from "@/lib/scout/briefing";
 export { createScoutResearchContext } from "@/lib/scout/buildContext";
 export { executeScoutPlan, planScoutAction, runScoutAgent, runScoutLoop } from "@/lib/scout/agent";
 export {
@@ -47,6 +48,13 @@ export type {
   ScoutScanFilters
 } from "@/lib/scout/types";
 export type { BuildScoutContextInput } from "@/lib/scout/context";
+export type {
+  GenerateScoutBriefingInput,
+  ScoutBriefing,
+  ScoutBriefingInsight,
+  ScoutBriefingPriority,
+  ScoutBriefingRecommendedAction
+} from "@/lib/scout/briefing";
 export type { CreateScoutResearchContextInput } from "@/lib/scout/buildContext";
 export type {
   RunScoutAgentInput,
