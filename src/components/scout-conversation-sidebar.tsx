@@ -18,13 +18,15 @@ type ScoutConversationSidebarProps = {
   selectedConversationId: string | null;
   onNewConversation: () => void;
   onSelectConversation: (conversation: ScoutConversationListItem) => void;
+  disabled?: boolean;
 };
 
 export function ScoutConversationSidebar({
   conversations,
   selectedConversationId,
   onNewConversation,
-  onSelectConversation
+  onSelectConversation,
+  disabled = false
 }: ScoutConversationSidebarProps) {
   return <aside className="flex min-h-[18rem] flex-col border-b border-white/10 bg-[#0b1119]/80 p-4 lg:min-h-0 lg:border-b-0 lg:border-r">
     <div className="flex items-center gap-3 px-1">
@@ -35,7 +37,7 @@ export function ScoutConversationSidebar({
       </div>
     </div>
 
-    <Button className="mt-6 w-full justify-start" variant="secondary" size="sm" onClick={onNewConversation}>
+    <Button className="mt-6 w-full justify-start" variant="secondary" size="sm" onClick={onNewConversation} disabled={disabled}>
       <Plus className="size-4" />New conversation
     </Button>
 
@@ -45,9 +47,10 @@ export function ScoutConversationSidebar({
         {conversations.length > 0 ? conversations.map((conversation) => <button
           key={conversation.id}
           type="button"
+          disabled={disabled}
           onClick={() => onSelectConversation(conversation)}
           className={cn(
-            "group flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition-colors",
+            "group flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
             selectedConversationId === conversation.id
               ? "bg-brand/10 text-ink"
               : "text-muted hover:bg-white/[0.05] hover:text-ink"

@@ -21,7 +21,7 @@ export function OnboardingForm() {
     event.preventDefault(); setLoading(true); setError(null);
     const response = await fetch("/api/v1/preferences", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ industries: [industry], buyer_types: [buyerType], geography: "US", risk_appetite: risk.toLowerCase(), goals: [goal] }) });
     if (!response.ok) { const data = await response.json().catch(() => null); setError(data?.error?.message ?? "We could not save your preferences. Please try again."); setLoading(false); return; }
-    window.location.assign("/app/scan");
+    window.location.assign("/app/scout");
   }
 
   return <form onSubmit={submit} className="space-y-7">

@@ -20,7 +20,7 @@ type ScanRow = {
 };
 
 type OpportunityRow = { id: string; title: string | null; opportunity_score: number | null; created_at: string };
-type ScheduleRow = { id: string; objective_id: string; frequency: string; next_run_at: string; created_at: string };
+type ScheduleRow = { id: string; objective_id: string; frequency: string; next_run_at: string; created_at: string; enabled: boolean; last_run_at: string | null };
 
 export default async function ScoutPage() {
   const supabase = await createClient();
@@ -37,7 +37,7 @@ export default async function ScoutPage() {
     getScoutExecutions({ organization_id: organizationId }),
     supabase.from("scans").select("id,status,filters,requested_at,progress_stage,progress_message,evidence_count,opportunity_count").eq("organization_id", organizationId).in("status", ["queued", "running"]).order("requested_at", { ascending: false }).limit(4),
     supabase.from("opportunities").select("id,title,opportunity_score,created_at,scan_opportunities!inner(scans!inner(organization_id))").eq("scan_opportunities.scans.organization_id", organizationId).order("created_at", { ascending: false }).limit(5),
-    supabase.from("scout_schedules").select("id,objective_id,frequency,next_run_at,created_at").eq("organization_id", organizationId).eq("enabled", true).order("next_run_at", { ascending: true }).limit(5)
+    supabase.from("scout_schedules").select("id,objective_id,frequency,next_run_at,created_at,enabled,last_run_at").eq("organization_id", organizationId).order("next_run_at", { ascending: true }).limit(5)
   ]);
 
   const conversationHistory = await Promise.all(conversations.map(async (conversation) => [
@@ -77,7 +77,7 @@ export default async function ScoutPage() {
     memoryCount: memories.length,
     feedbackCount: feedback.length,
     recentExecutions: executions.slice(0, 3).map((execution) => ({ id: execution.id, status: execution.status, completedAt: execution.completed_at, toolsUsed: execution.tools_used.length, stepsCompleted: execution.steps_completed })),
-    upcomingSchedules: schedules.map((schedule) => ({ id: schedule.id, objectiveTitle: objectiveTitles.get(schedule.objective_id) ?? "Scout objective", frequency: schedule.frequency, nextRunAt: schedule.next_run_at })),
+    upcomingSchedules: schedules.map((schedule) => ({ id: schedule.id, objectiveTitle: objectiveTitles.get(schedule.objective_id) ?? "Scout objective", frequency: schedule.frequency, nextRunAt: schedule.next_run_at, state: !schedule.enabled ? "paused" : new Date(schedule.next_run_at).getTime() <= Date.now() ? "due" : "scheduled", lastRunAt: schedule.last_run_at })),
     research,
     activity
   };

@@ -10,7 +10,7 @@ export type ScoutWorkspaceStatusData = {
   memoryCount: number;
   feedbackCount: number;
   recentExecutions: Array<{ id: string; status: string; completedAt: string | null; toolsUsed: number; stepsCompleted: number }>;
-  upcomingSchedules: Array<{ id: string; objectiveTitle: string; frequency: string; nextRunAt: string }>;
+  upcomingSchedules: Array<{ id: string; objectiveTitle: string; frequency: string; nextRunAt: string; state: "due" | "scheduled" | "paused"; lastRunAt: string | null }>;
   research: ScoutResearchCardItem[];
   activity: ScoutActivityItem[];
 };
@@ -39,8 +39,8 @@ export function ScoutWorkspaceStatus({ data }: { data: ScoutWorkspaceStatusData 
       {data.recentExecutions.length > 0 ? <div className="space-y-2">{data.recentExecutions.map((execution) => <div key={execution.id}><p className="text-sm font-medium capitalize">{execution.status}</p><p className="mt-0.5 text-xs text-muted">{execution.stepsCompleted} steps · {execution.toolsUsed} tools{execution.completedAt ? ` · ${formatDate(execution.completedAt)}` : ""}</p></div>)}</div> : <Empty copy="No autonomous activity yet." />}
     </StatusCard>
 
-    <StatusCard icon={CalendarClock} label="Upcoming research">
-      {data.upcomingSchedules.length > 0 ? <div className="space-y-2">{data.upcomingSchedules.map((schedule) => <div key={schedule.id}><p className="truncate text-sm font-medium">{schedule.objectiveTitle}</p><p className="mt-0.5 text-xs text-muted">{schedule.frequency} · {formatDate(schedule.nextRunAt)}</p></div>)}</div> : <Empty copy="No scheduled research yet." />}
+    <StatusCard icon={CalendarClock} label="Scheduled research">
+      {data.upcomingSchedules.length > 0 ? <div className="space-y-2">{data.upcomingSchedules.map((schedule) => <div key={schedule.id}><div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-medium">{schedule.objectiveTitle}</p><span className="shrink-0 text-xs font-medium capitalize text-brand">{schedule.state === "scheduled" ? "Upcoming" : schedule.state}</span></div><p className="mt-0.5 text-xs text-muted">{schedule.frequency} · {schedule.state === "due" ? "Due now" : formatDate(schedule.nextRunAt)}</p>{schedule.lastRunAt ? <p className="mt-0.5 text-xs text-muted/75">Last completed {formatDate(schedule.lastRunAt)}</p> : null}</div>)}</div> : <Empty copy="No scheduled research yet." />}
     </StatusCard>
 
     <ScoutResearchCards items={data.research} />

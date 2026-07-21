@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Clock3, FileText } from "lucide-react";
 
@@ -59,8 +60,8 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
   };
 
   return <>
-    <Link href="/app/scan" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
-      <ArrowLeft className="size-4" />New research
+    <Link href={"/app/scout" as Route} className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
+      <ArrowLeft className="size-4" />Back to Scout
     </Link>
 
     <div className="mt-7 flex flex-wrap items-start justify-between gap-4">

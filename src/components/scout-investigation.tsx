@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { ScoutAvatar } from "@/components/scout-avatar";
 import { TypingIndicator } from "@/components/typing-indicator";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import type { ScanProgress } from "@/lib/scans/getScanProgress";
 
 type ScoutInvestigationProps = {
@@ -49,7 +50,7 @@ function currentStage(progress: ScanProgress | null): TimelineStage | null {
 function messageFor(progress: ScanProgress | null) {
   if (!progress) return stageMessages.queued;
   if (progress.status === "completed") return stageMessages.completed;
-  if (progress.status === "failed") return stageMessages.failed;
+  if (progress.status === "failed") return progress.progressMessage ?? stageMessages.failed;
   return stageMessages[progress.progressStage ?? progress.status] ?? progress.progressMessage ?? stageMessages.queued;
 }
 
@@ -64,17 +65,32 @@ export function ScoutInvestigation({ progress, scanId, createdAt, children }: Sc
   const stage = currentStage(progress);
   const previousStage = useRef<string | null>(null);
   const [isTyping, setIsTyping] = useState(true);
+  const [executionError, setExecutionError] = useState<string | null>(null);
   const [stageTimestamps, setStageTimestamps] = useState<Record<string, string>>(
     (): Record<string, string> => createdAt ? { brief: createdAt } : {}
   );
   const isComplete = progress?.status === "completed";
   const isTerminal = isComplete || progress?.status === "failed" || progress?.status === "cancelled";
 
-  useEffect(() => {
-    if (progress?.status !== "queued" || executionTriggered.current) return;
+  async function triggerExecution() {
+    if (executionTriggered.current) return;
     executionTriggered.current = true;
-    void fetch(`/api/v1/scans/${scanId}/execute`, { method: "POST" })
-      .catch((error) => console.error("Unable to trigger scan execution", { scanId, error }));
+    setExecutionError(null);
+    try {
+      const response = await fetch(`/api/v1/scans/${scanId}/execute`, { method: "POST" });
+      if (response.ok) return;
+      const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+      setExecutionError(body?.error?.message ?? "Scout could not start this investigation. Please try again.");
+      executionTriggered.current = false;
+    } catch {
+      setExecutionError("Scout could not start this investigation. Please try again.");
+      executionTriggered.current = false;
+    }
+  }
+
+  useEffect(() => {
+    if (progress?.status !== "queued") return;
+    void triggerExecution();
   }, [progress?.status, scanId]);
 
   useEffect(() => {
@@ -132,6 +148,7 @@ export function ScoutInvestigation({ progress, scanId, createdAt, children }: Sc
               className="mt-3 max-w-2xl rounded-2xl rounded-tl-sm border border-white/10 bg-black/15 p-4 text-sm leading-6 text-muted"
             >
               {isComplete ? <><p className="font-medium text-ink">Investigation complete.</p><p className="mt-1">I found {progress?.opportunityCount ?? 0} evidence-backed {progress?.opportunityCount === 1 ? "opportunity" : "opportunities"} worth exploring.</p></> : <p>{messageFor(progress)}</p>}
+              {executionError ? <div role="alert" className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-200"><span>{executionError}</span><Button type="button" size="sm" variant="secondary" onClick={() => void triggerExecution()}>Retry</Button></div> : null}
               {isTyping && !isTerminal ? <div className="mt-3"><TypingIndicator /></div> : null}
             </motion.div>
           </AnimatePresence>
