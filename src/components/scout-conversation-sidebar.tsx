@@ -10,6 +10,7 @@ export type ScoutConversationListItem = {
   id: string;
   title: string;
   updatedAt: string;
+  preview: string | null;
 };
 
 type ScoutConversationSidebarProps = {
@@ -55,7 +56,8 @@ export function ScoutConversationSidebar({
           <MessageCircle className="mt-0.5 size-4 shrink-0 text-brand/80" />
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{conversation.title}</span>
-            <span className="mt-0.5 block text-xs text-muted">{formatUpdatedAt(conversation.updatedAt)}</span>
+            <span className="mt-0.5 block truncate text-xs text-muted">{conversation.preview ?? "No messages yet"}</span>
+            <span className="mt-1 block text-xs text-muted/70">{formatUpdatedAt(conversation.updatedAt)}</span>
           </span>
         </button>) : <p className="px-3 py-4 text-sm leading-6 text-muted">Your conversations with Scout will appear here.</p>}
       </div>
@@ -67,5 +69,11 @@ function formatUpdatedAt(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Recent";
 
+  const minutes = Math.round((Date.now() - date.getTime()) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  if (hours < 48) return "Yesterday";
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
 }
