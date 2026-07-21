@@ -2,7 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+:root {
+  color-scheme: dark;
+  --scout-mint: #a8ffcc;
+  --scout-aqua: #c8f7ff;
+  --scout-violet: #9e8cff;
+  --scout-ink: #f5f7fb;
+  --scout-muted: #9ba9bd;
+  --scout-surface: rgb(16 21 30 / 0.82);
+  --scout-line: rgb(255 255 255 / 0.1);
+  --scout-danger: #f8a3a3;
+}
 * { border-color: rgb(255 255 255 / 0.1); }
 html { background: #080b10; }
 body { min-height: 100vh; background: #080b10; color: #f5f7fb; }
@@ -12,4 +22,74 @@ body { min-height: 100vh; background: #080b10; color: #f5f7fb; }
   background-image: linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
   background-size: 42px 42px;
   mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+@layer components {
+  .scout-surface {
+    border: 1px solid var(--scout-line);
+    background: linear-gradient(145deg, rgb(20 29 41 / 0.88), var(--scout-surface));
+    box-shadow: 0 18px 48px rgb(0 0 0 / 0.2), inset 0 1px 0 rgb(255 255 255 / 0.04);
+    backdrop-filter: blur(18px);
+  }
+
+  .scout-card {
+    border: 1px solid var(--scout-line);
+    border-radius: 1rem;
+    background: rgb(255 255 255 / 0.035);
+    padding: 1rem;
+  }
+
+  .scout-card-interactive {
+    transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+  }
+
+  .scout-card-interactive:hover {
+    border-color: rgb(168 255 204 / 0.35);
+    background: rgb(168 255 204 / 0.05);
+    transform: translateY(-1px);
+  }
+
+  .scout-eyebrow {
+    color: var(--scout-mint);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    line-height: 1rem;
+    text-transform: uppercase;
+  }
+
+  .scout-title {
+    color: var(--scout-ink);
+    font-size: 1.125rem;
+    font-weight: 650;
+    letter-spacing: -0.018em;
+    line-height: 1.35;
+  }
+
+  .scout-body {
+    color: var(--scout-muted);
+    font-size: 0.875rem;
+    line-height: 1.65;
+  }
+
+  .scout-empty {
+    display: grid;
+    min-height: 11rem;
+    place-items: center;
+    border: 1px dashed rgb(255 255 255 / 0.14);
+    border-radius: 1rem;
+    background: rgb(255 255 255 / 0.018);
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .scout-empty-icon {
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    place-items: center;
+    border-radius: 0.875rem;
+    background: rgb(168 255 204 / 0.1);
+    color: var(--scout-mint);
+  }
 }
