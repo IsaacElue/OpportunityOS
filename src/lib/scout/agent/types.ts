@@ -51,4 +51,8 @@ export type ScoutAgentRun = {
   observation: string;
 };
 
-export type RunScoutLoopInput = RunScoutAgentInput;
+export type RunScoutLoopInput = RunScoutAgentInput & {
+  organization_id?: string;
+  objective_id?: string;
+  execution_id?: string;
+};

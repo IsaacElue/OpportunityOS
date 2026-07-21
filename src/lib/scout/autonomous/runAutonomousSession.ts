@@ -119,9 +119,17 @@ export async function runScoutAutonomousSession({
   organization_id,
   objective_id
 }: RunScoutAutonomousSessionInput): Promise<ScoutAutonomousExecutionSummary> {
+  const startedAtMs = Date.now();
   const startedAt = new Date().toISOString();
   let objective: ScoutObjective | undefined;
   let executionId: string | undefined;
+  console.info("Scout autonomous session started", {
+    organization_id,
+    objective_id: objective_id ?? null,
+    execution_id: null,
+    duration_ms: 0,
+    status: "running"
+  });
 
   try {
     if (objective_id) {
@@ -132,7 +140,15 @@ export async function runScoutAutonomousSession({
       objective = objectives[0];
     }
     if (!objective) {
-      return summary(startedAt, "no_active_objective", "Scout found no active objectives to work on.");
+      const result = summary(startedAt, "no_active_objective", "Scout found no active objectives to work on.");
+      console.info("Scout autonomous session completed", {
+        organization_id,
+        objective_id: objective_id ?? null,
+        execution_id: null,
+        duration_ms: Date.now() - startedAtMs,
+        status: result.status
+      });
+      return result;
     }
 
     const execution = await createScoutExecution({
@@ -148,7 +164,10 @@ export async function runScoutAutonomousSession({
     });
     const agentRun = await runScoutLoop({
       context,
-      goal: `Objective: ${objective.title}\n\n${objective.goal}`
+      goal: `Objective: ${objective.title}\n\n${objective.goal}`,
+      organization_id,
+      objective_id: objective.id,
+      execution_id: execution.id
     });
     const completedAt = new Date().toISOString();
     const status = agentRun.completed ? "completed" : "failed";
@@ -164,7 +183,7 @@ export async function runScoutAutonomousSession({
     if (!savedExecution) throw new Error("Scout execution record could not be finalized.");
     const objectiveStatusChange = await updateObjectiveLifecycle(organization_id, objective, agentRun);
 
-    return {
+    const result: ScoutAutonomousExecutionSummary = {
       objective_id: objective.id,
       objective_title: objective.title,
       status: agentRun.completed ? "completed" : "stopped",
@@ -175,6 +194,14 @@ export async function runScoutAutonomousSession({
       started_at: startedAt,
       completed_at: completedAt
     };
+    console.info("Scout autonomous session completed", {
+      organization_id,
+      objective_id: objective.id,
+      execution_id: execution.id,
+      duration_ms: Date.now() - startedAtMs,
+      status: result.status
+    });
+    return result;
   } catch {
     if (executionId) {
       try {
@@ -192,11 +219,20 @@ export async function runScoutAutonomousSession({
       }
     }
 
-    return summary(
+    const result = summary(
       startedAt,
       "failed",
       "Scout could not complete the autonomous objective session.",
       objective
     );
+    console.error("Scout autonomous session failed", {
+      organization_id,
+      objective_id: objective?.id ?? objective_id ?? null,
+      execution_id: executionId ?? null,
+      duration_ms: Date.now() - startedAtMs,
+      status: "failed",
+      error: "Autonomous session failed."
+    });
+    return result;
   }
 }

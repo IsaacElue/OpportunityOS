@@ -52,13 +52,30 @@ function runResult(
 }
 
 /** Run a bounded reasoning-action-observation workflow with at most five reasoning cycles. */
-export async function runScoutLoop({ context, goal }: RunScoutLoopInput): Promise<ScoutAgentRun> {
+export async function runScoutLoop({
+  context,
+  goal,
+  organization_id,
+  objective_id,
+  execution_id
+}: RunScoutLoopInput): Promise<ScoutAgentRun> {
   const steps: ScoutAgentStep[] = [];
+  const logContext = {
+    organization_id: organization_id ?? null,
+    objective_id: objective_id ?? null,
+    execution_id: execution_id ?? null
+  };
 
   for (let stepNumber = 0; stepNumber < MAX_AGENT_STEPS; stepNumber += 1) {
+    const reasoningStartedAt = Date.now();
     const decision = await reasonWithScout({
       context,
       goal: reasoningGoal(goal, steps)
+    });
+    console.info("Scout reasoning completed", {
+      ...logContext,
+      duration_ms: Date.now() - reasoningStartedAt,
+      status: "completed"
     });
 
     const toolPlan = planScoutTool({
@@ -73,7 +90,12 @@ export async function runScoutLoop({ context, goal }: RunScoutLoopInput): Promis
     }
 
     const tool = toolPlan.next_tool;
-    const result: ToolResult = await executeScoutTool(tool, { context, goal, decision });
+    const result: ToolResult = await executeScoutTool(tool, {
+      context,
+      goal,
+      decision,
+      scout_log_context: logContext
+    });
     const observation = `${toolPlan.reason} ${observationFor(result, decision.action)}`;
     steps.push({ decision, ...(tool ? { tool } : {}), result, observation });
 
