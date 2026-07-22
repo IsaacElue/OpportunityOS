@@ -1,6 +1,7 @@
 "use client";
 
 import { Wrench } from "lucide-react";
+import { useId } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { ScoutStatusBadge, type ScoutState } from "@/components/scout-status-badge";
@@ -27,16 +28,17 @@ export type ScoutCurrentTaskData = {
 
 export function ScoutCurrentTask({ task, className }: { task: ScoutCurrentTaskData; className?: string }) {
   const reduceMotion = useReducedMotion();
+  const headingId = useId();
   const isActive = task.state === "thinking" || task.state === "researching" || task.state === "analysing";
   const statusState: ScoutState = task.state === "researching" || task.state === "analysing" ? "investigating" : task.state;
 
-  return <section className={cn("scout-surface relative overflow-hidden rounded-3xl p-5 sm:p-6", className)} aria-labelledby="scout-current-task-heading">
+  return <section className={cn("scout-surface relative overflow-hidden rounded-3xl p-5 sm:p-6", className)} aria-labelledby={headingId}>
     <div className="pointer-events-none absolute -right-12 -top-16 size-40 rounded-full bg-brand/10 blur-3xl" />
     <div className="relative">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="scout-eyebrow">Current task</p>
-          <h2 id="scout-current-task-heading" className="scout-title mt-1">{task.title}</h2>
+          <h2 id={headingId} className="scout-title mt-1">{task.title}</h2>
         </div>
         <ScoutStatusBadge state={statusState} />
       </div>

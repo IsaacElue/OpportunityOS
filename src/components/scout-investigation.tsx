@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, Circle, Loader2, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -62,6 +62,7 @@ function formatTimestamp(value: string | null) {
 
 export function ScoutInvestigation({ progress, scanId, createdAt, children }: ScoutInvestigationProps) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const executionTriggered = useRef(false);
   const stage = currentStage(progress);
   const previousStage = useRef<string | null>(null);
@@ -142,10 +143,10 @@ export function ScoutInvestigation({ progress, scanId, createdAt, children }: Sc
           <AnimatePresence mode="wait">
             <motion.div
               key={`${progress?.status ?? "queued"}-${progress?.progressStage ?? "queued"}`}
-              initial={{ opacity: 0, y: 6 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+              transition={{ duration: reduceMotion ? 0 : 0.2 }}
               className="mt-3 max-w-2xl rounded-2xl rounded-tl-sm border border-white/10 bg-black/15 p-4 text-sm leading-6 text-muted"
             >
               {isComplete ? <><p className="font-medium text-ink">Investigation complete.</p><p className="mt-1">I found {progress?.opportunityCount ?? 0} evidence-backed {progress?.opportunityCount === 1 ? "opportunity" : "opportunities"} worth exploring.</p></> : <p>{messageFor(progress)}</p>}
@@ -174,14 +175,14 @@ export function ScoutInvestigation({ progress, scanId, createdAt, children }: Sc
           return <ScoutTimelineMotion key={item.id} index={index} isActive={isActive} isComplete={isDone} className={isFuture ? "opacity-45" : ""}>
             {index < timeline.length - 1 ? <span className={"absolute bottom-0 left-[1.15rem] top-9 w-px " + (isDone ? "bg-brand/50" : "bg-white/10")} /> : null}
             <span className={"relative z-10 grid size-7 shrink-0 place-items-center rounded-full border " + (isDone ? "border-brand/30 bg-brand text-brand-ink" : isActive ? "border-brand/40 bg-brand/10 text-brand" : "border-white/10 bg-white/[0.04] text-muted")}>
-              {isDone ? <Check className="size-4" /> : isActive ? <Loader2 className="size-4 animate-spin" /> : <Circle className="size-3" />}
+              {isDone ? <Check className="size-4" /> : isActive ? <Loader2 className={reduceMotion ? "size-4" : "size-4 animate-spin"} /> : <Circle className="size-3" />}
             </span>
             <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className={isActive ? "font-medium text-ink" : "text-sm font-medium"}>{item.label}</p>
                 <time dateTime={observedAt} className="text-xs text-muted">{timestamp}</time>
               </div>
-              {isActive ? <p className="mt-1 flex items-center gap-1.5 text-sm text-brand"><Search className="size-3.5 animate-pulse" />{progress?.progressMessage ?? "Working through the evidence"}</p> : null}
+              {isActive ? <p className="mt-1 flex items-center gap-1.5 text-sm text-brand"><Search className={reduceMotion ? "size-3.5" : "size-3.5 animate-pulse"} />{progress?.progressMessage ?? "Working through the evidence"}</p> : null}
             </div>
           </ScoutTimelineMotion>;
         })}
@@ -189,7 +190,7 @@ export function ScoutInvestigation({ progress, scanId, createdAt, children }: Sc
     </Card>
 
     <AnimatePresence initial={false}>
-      {isComplete ? <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.15 }}>
+      {isComplete ? <motion.div initial={reduceMotion ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.35, delay: reduceMotion ? 0 : 0.15 }}>
         {children}
       </motion.div> : null}
     </AnimatePresence>

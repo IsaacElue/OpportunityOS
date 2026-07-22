@@ -50,7 +50,7 @@ export function ScoutConversationSidebar({
           disabled={disabled}
           onClick={() => onSelectConversation(conversation)}
           className={cn(
-            "group flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+            "group flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-60",
             selectedConversationId === conversation.id
               ? "bg-brand/10 text-ink"
               : "text-muted hover:bg-white/[0.05] hover:text-ink"

@@ -4,6 +4,7 @@ import { CheckCircle2, Clock3, Compass, Lightbulb, MemoryStick, Search, Wrench }
 import { motion, useReducedMotion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/formatRelativeTime";
 
 export type ScoutActivityType = "investigation" | "opportunity" | "memory" | "objective" | "schedule" | "tool" | "execution" | "feedback";
 
@@ -27,16 +28,4 @@ export function ScoutActivityItem({ activity, index = 0, className }: { activity
 function ActivityIcon({ type }: { type: ScoutActivityType }) {
   const Icon = type === "opportunity" ? Lightbulb : type === "memory" || type === "feedback" ? MemoryStick : type === "investigation" ? Search : type === "objective" ? CheckCircle2 : type === "tool" ? Wrench : type === "schedule" ? Clock3 : Compass;
   return <Icon className="size-3.5" />;
-}
-
-function formatRelativeTime(value: string) {
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return "Recently";
-  const minutes = Math.round((Date.now() - timestamp) / 60_000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
 }
