@@ -1,4 +1,7 @@
+"use client";
+
 import { AlertTriangle, Check, Circle, Search, Sparkles } from "lucide-react";
+import { useReducedMotion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 
@@ -13,7 +16,8 @@ const stateContent: Record<ScoutState, { label: string; icon: typeof Sparkles; c
 };
 
 export function ScoutStatusBadge({ state, label, className }: { state: ScoutState; label?: string; className?: string }) {
+  const reduceMotion = useReducedMotion();
   const content = stateContent[state];
   const Icon = content.icon;
-  return <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium", content.className, className)}><Icon className={cn("size-3.5", state === "thinking" || state === "investigating" ? "animate-pulse" : "")} aria-hidden="true" />{label ?? content.label}</span>;
+  return <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium", content.className, className)}><Icon className={cn("size-3.5", !reduceMotion && (state === "thinking" || state === "investigating") ? "animate-pulse" : "")} aria-hidden="true" />{label ?? content.label}</span>;
 }
