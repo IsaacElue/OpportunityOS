@@ -10,6 +10,7 @@ import { saveReport } from "@/lib/reports/saveReport";
 import type { FounderOpportunityReportInput, ReportEvidence } from "@/lib/reports/types";
 import { scoreOpportunity } from "@/lib/scoring/opportunityScore";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordScanProgress } from "@/lib/scans/recordScanProgress";
 
 type ScanFilters = {
   industry?: string;
@@ -90,6 +91,18 @@ function reportErrorMessage(error: unknown) {
   return "Report generation failed unexpectedly.";
 }
 
+async function recordProgressSafely(input: Parameters<typeof recordScanProgress>[0]) {
+  try {
+    await recordScanProgress(input);
+  } catch (error) {
+    console.error("Scan progress event failed", {
+      scanId: input.scanId,
+      stage: input.stage,
+      error: errorMessage(error).slice(0, 300)
+    });
+  }
+}
+
 function deduplicateEvidence(items: EvidenceItem[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -127,7 +140,7 @@ async function collectEvidence(query: string): Promise<EvidenceItem[]> {
     throw new Error("All evidence sources failed.");
   }
 
-  return deduplicateEvidence(evidenceItems);
+  return evidenceItems;
 }
 
 async function findEvidenceId(
@@ -231,18 +244,56 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
 
     await updateScan(supabase, scanId, {
       status: "running",
-      stage: "collecting_evidence",
-      progress: 10,
-      progress_stage: "collecting_evidence",
-      progress_message: "Searching market signals",
+      stage: "initializing",
+      progress: 5,
+      progress_stage: "initializing",
+      progress_message: "Initialising investigation",
       evidence_count: 0,
       opportunity_count: 0
     });
+    await recordProgressSafely({ scanId, stage: "initializing", message: "Initialising investigation" });
 
-    const evidenceItems = await collectEvidence(query);
+    await updateScan(supabase, scanId, {
+      status: "running",
+      stage: "searching_sources",
+      progress: 15,
+      progress_stage: "searching_sources",
+      progress_message: "Searching Reddit and Hacker News"
+    });
+    await recordProgressSafely({ scanId, stage: "searching_sources", message: "Searching Reddit and Hacker News" });
+
+    const collectedEvidence = await collectEvidence(query);
+    await updateScan(supabase, scanId, {
+      status: "running",
+      stage: "collecting_evidence",
+      progress: 30,
+      progress_stage: "collecting_evidence",
+      progress_message: "Collecting evidence",
+      evidence_count: collectedEvidence.length
+    });
+    await recordProgressSafely({
+      scanId,
+      stage: "collecting_evidence",
+      message: "Collecting evidence",
+      evidenceCount: collectedEvidence.length
+    });
+
+    const evidenceItems = deduplicateEvidence(collectedEvidence);
+    await updateScan(supabase, scanId, {
+      status: "running",
+      stage: "deduplicating_evidence",
+      progress: 38,
+      progress_stage: "deduplicating_evidence",
+      progress_message: "Removing duplicate evidence",
+      evidence_count: evidenceItems.length
+    });
+    await recordProgressSafely({
+      scanId,
+      stage: "deduplicating_evidence",
+      message: "Removing duplicate evidence",
+      evidenceCount: evidenceItems.length
+    });
     await saveEvidence(evidenceItems);
-
-
 
     await updateScan(supabase, scanId, {
       status: "running",
@@ -251,6 +302,12 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       progress_stage: "analyzing_evidence",
       progress_message: "Extracting opportunities",
       evidence_count: evidenceItems.length
+    });
+    await recordProgressSafely({
+      scanId,
+      stage: "analyzing_evidence",
+      message: "Extracting opportunities",
+      evidenceCount: evidenceItems.length
     });
 
     let opportunitiesCreated = 0;
@@ -307,6 +364,13 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       evidence_count: evidenceItems.length,
       opportunity_count: opportunitiesCreated
     });
+    await recordProgressSafely({
+      scanId,
+      stage: "scoring",
+      message: "Ranking opportunities",
+      evidenceCount: evidenceItems.length,
+      opportunityCount: opportunitiesCreated
+    });
 
     for (const [index, opportunity] of opportunitiesToScore.entries()) {
       await scoreOpportunity({
@@ -332,6 +396,13 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       progress_stage: "generating_reports",
       progress_message: "Preparing founder reports",
       opportunity_count: opportunitiesCreated
+    });
+    await recordProgressSafely({
+      scanId,
+      stage: "generating_reports",
+      message: "Preparing founder reports",
+      evidenceCount: evidenceItems.length,
+      opportunityCount: opportunitiesCreated
     });
 
     for (const [index, opportunity] of opportunitiesToScore.entries()) {
@@ -366,7 +437,9 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       stage: "completed",
       progress: 100,
       progress_stage: "complete",
-      progress_message: "Research complete",
+      progress_message: extractionFailures > 0
+        ? "Research complete with extraction warnings"
+        : "Research complete",
       evidence_count: evidenceItems.length,
       opportunity_count: opportunitiesCreated,
       completed_at: completedAt.toISOString(),
@@ -374,6 +447,14 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       error_detail: extractionFailures > 0
         ? `${extractionFailures} evidence item${extractionFailures === 1 ? "" : "s"} could not be converted into opportunities.`
         : null
+    });
+    await recordProgressSafely({
+      scanId,
+      stage: "complete",
+      message: extractionFailures > 0 ? "Research complete with extraction warnings" : "Research complete",
+      status: "completed",
+      evidenceCount: evidenceItems.length,
+      opportunityCount: opportunitiesCreated
     });
 
     return {
@@ -393,6 +474,7 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
         error_code: "scan_orchestration_failed",
         error_detail: message
       });
+      await recordProgressSafely({ scanId, stage: "failed", message, status: "failed" });
     } catch {
       // Preserve the original workflow failure when status persistence also fails.
     }

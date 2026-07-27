@@ -84,7 +84,7 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
       </span>
     </div>
 
-    <ScoutInvestigation progress={progress} scanId={scan.id} createdAt={scan.requested_at}>
+    <ScoutInvestigation progress={progress} scanId={scan.id} createdAt={scan.requested_at} reportCount={reports.length}>
 
     <section id="opportunity-results" className="mt-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -100,10 +100,14 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
       {opportunities.length > 0 ? <div className="mt-4 grid gap-4">
         {opportunities.map((opportunity) => <OpportunityResult key={opportunity.id} opportunity={opportunity} detail={detailsById.get(opportunity.id) ?? null} />)}
       </div> : <Card className="mt-4 border-dashed p-6">
-        <p className="font-medium">No opportunities discovered yet</p>
+        <p className="font-medium">Scout did not find a high-confidence opportunity</p>
         <p className="mt-1 text-sm leading-6 text-muted">
-          Results will appear here after evidence has been analyzed for this research brief.
+          {progress?.status === "completed"
+            ? `Scout reviewed ${progress.evidenceCount} evidence ${progress.evidenceCount === 1 ? "item" : "items"}, but the signal did not meet the extraction threshold.`
+            : "Results will appear here after evidence has been analyzed for this research brief."}
         </p>
+        {progress?.status === "completed" ? <div className="mt-4 rounded-xl bg-brand/[0.06] p-4 text-sm leading-6 text-muted"><p className="font-medium text-ink">Try widening the brief</p><p className="mt-1">Consider removing a narrow filter, broadening the geography, or naming a different buyer problem. The evidence collected above is still available to inspect.</p></div> : null}
+        {progress?.errorDetail ? <p className="mt-3 text-sm text-amber-100">Warning: {progress.errorDetail}</p> : null}
       </Card>}
     </section>
 
@@ -121,9 +125,11 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
       {reports.length > 0 ? <div className="mt-4 grid gap-4">
         {reports.map((report) => <FounderOpportunityReportCard key={report.id} report={report} />)}
       </div> : <Card className="mt-4 border-dashed p-6">
-        <p className="font-medium">Report generation in progress</p>
+        <p className="font-medium">{progress?.status === "completed" ? "No founder report was generated" : "Report generation in progress"}</p>
         <p className="mt-1 text-sm leading-6 text-muted">
-          Evidence-backed founder reports will appear here once opportunity analysis is complete.
+          {progress?.status === "completed"
+            ? "Scout did not generate a report because the available evidence did not support a high-confidence opportunity."
+            : "Evidence-backed founder reports will appear here once opportunity analysis is complete."}
         </p>
       </Card>}
     </section>
