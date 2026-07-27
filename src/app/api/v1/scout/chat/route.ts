@@ -38,6 +38,7 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+
   if (!user) return errorResponse(401, "unauthorized", "Sign in to continue.");
 
   const { data: membership } = await supabase
@@ -127,10 +128,15 @@ export async function POST(request: Request) {
     return errorResponse(500, "scout_message_persist_failed", "Scout could not save this conversation.", true);
   }
 
-  return NextResponse.json({
-    message: responseMessage,
-    action,
-    ...(scanId ? { scanId } : {}),
-    conversationId: conversation.id
-  }, { status: action === "research_started" ? 202 : 200 });
+  return NextResponse.json(
+    {
+      message: responseMessage,
+      action,
+      ...(scanId ? { scanId } : {}),
+      conversationId: conversation.id
+    },
+    {
+      status: action === "research_started" ? 202 : 200
+    }
+  );
 }

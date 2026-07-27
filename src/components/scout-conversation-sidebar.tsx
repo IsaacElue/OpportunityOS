@@ -1,6 +1,7 @@
 "use client";
 
-import { MessageCircle, Plus } from "lucide-react";
+import { MessageCircle, Plus, Search } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { ScoutAvatar } from "@/components/scout-avatar";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,13 @@ export function ScoutConversationSidebar({
   onSelectConversation,
   disabled = false
 }: ScoutConversationSidebarProps) {
+  const [search, setSearch] = useState("");
+  const filteredConversations = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return conversations;
+    return conversations.filter((conversation) => `${conversation.title} ${conversation.preview ?? ""}`.toLowerCase().includes(query));
+  }, [conversations, search]);
+
   return <aside className="flex min-h-[18rem] flex-col border-b border-white/10 bg-[#0b1119]/80 p-4 lg:min-h-0 lg:border-b-0 lg:border-r">
     <div className="flex items-center gap-3 px-1">
       <ScoutAvatar size="md" />
@@ -42,9 +50,10 @@ export function ScoutConversationSidebar({
     </Button>
 
     <div className="mt-6 min-h-0 flex-1">
-      <p className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">Conversations</p>
+      <div className="flex items-center justify-between gap-2 px-1"><p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">Conversations</p><span className="text-xs text-muted/70">{conversations.length}</span></div>
+      <label className="relative mt-3 block"><span className="sr-only">Search conversations</span><Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted" /><input value={search} onChange={(event) => setSearch(event.target.value)} disabled={disabled} placeholder="Search conversations" className="h-9 w-full rounded-lg border border-white/10 bg-white/[0.04] pl-9 pr-3 text-xs text-ink outline-none placeholder:text-muted/70 focus:border-brand/60 focus:ring-2 focus:ring-brand/15 disabled:cursor-not-allowed disabled:opacity-60" /></label>
       <div className="mt-3 space-y-1 overflow-y-auto pr-1">
-        {conversations.length > 0 ? conversations.map((conversation) => <button
+        {filteredConversations.length > 0 ? filteredConversations.map((conversation) => <button
           key={conversation.id}
           type="button"
           disabled={disabled}
@@ -62,7 +71,7 @@ export function ScoutConversationSidebar({
             <span className="mt-0.5 block truncate text-xs text-muted">{conversation.preview ?? "No messages yet"}</span>
             <span className="mt-1 block text-xs text-muted/70">{formatUpdatedAt(conversation.updatedAt)}</span>
           </span>
-        </button>) : <p className="px-3 py-4 text-sm leading-6 text-muted">Your conversations with Scout will appear here.</p>}
+        </button>) : <p className="px-3 py-4 text-sm leading-6 text-muted">{search.trim() ? "No conversations match that search." : "Your conversations with Scout will appear here."}</p>}
       </div>
     </div>
   </aside>;

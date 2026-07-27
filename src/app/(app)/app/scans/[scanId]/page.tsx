@@ -4,7 +4,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Clock3, FileText } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { FounderReportSections } from "@/components/founder-report-sections";
+import { OpportunityEvidence } from "@/components/opportunity-evidence";
 import { ScoutInvestigation } from "@/components/scout-investigation";
+import { getOpportunity, type Opportunity } from "@/lib/opportunities/getOpportunity";
 import { getScanOpportunities, type ScanOpportunity } from "@/lib/opportunities/getScanOpportunities";
 import { getScanProgress } from "@/lib/scans/getScanProgress";
 import { createClient } from "@/lib/supabase/server";
@@ -52,6 +55,8 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
   ]);
   if (reportResult.error) throw new Error(`Unable to fetch opportunity reports: ${reportResult.error.message}`);
   const reports = (reportResult.data ?? []) as unknown as ScanReport[];
+  const opportunityDetails = await Promise.all(opportunities.map(async (opportunity) => [opportunity.id, await getOpportunity(opportunity.id)] as const));
+  const detailsById = new Map(opportunityDetails);
   const filters = scan.filters as {
     industry?: string;
     buyer_type?: string;
@@ -93,7 +98,7 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
       </div>
 
       {opportunities.length > 0 ? <div className="mt-4 grid gap-4">
-        {opportunities.map((opportunity) => <OpportunityResult key={opportunity.id} opportunity={opportunity} />)}
+        {opportunities.map((opportunity) => <OpportunityResult key={opportunity.id} opportunity={opportunity} detail={detailsById.get(opportunity.id) ?? null} />)}
       </div> : <Card className="mt-4 border-dashed p-6">
         <p className="font-medium">No opportunities discovered yet</p>
         <p className="mt-1 text-sm leading-6 text-muted">
@@ -126,7 +131,7 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ sca
   </>;
 }
 
-function OpportunityResult({ opportunity }: { opportunity: ScanOpportunity }) {
+function OpportunityResult({ opportunity, detail }: { opportunity: ScanOpportunity; detail: Opportunity | null }) {
   return <Card className="p-5 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -166,6 +171,7 @@ function OpportunityResult({ opportunity }: { opportunity: ScanOpportunity }) {
         <Score label="Competition gap" value={opportunity.competitionGapScore} />
       </dl>
     </div>
+    {detail ? <OpportunityEvidence evidence={detail.evidence} /> : null}
   </Card>;
 }
 
@@ -183,7 +189,7 @@ function FounderOpportunityReportCard({ report }: { report: ScanReport }) {
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <p className="text-sm font-medium text-brand">Founder Opportunity Report</p>
-        <h3 className="mt-1 text-lg font-semibold">{opportunity?.title ?? "Opportunity analysis"}</h3>
+        <h3 className="mt-1 text-lg font-semibold"><Link href={`/app/reports/${report.id}` as Route} className="hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60">{opportunity?.title ?? "Opportunity analysis"}</Link></h3>
       </div>
       <div className="rounded-xl border border-brand/20 bg-brand/10 px-3 py-2 text-right">
         <p className="text-xs text-muted">Confidence score</p>
@@ -191,22 +197,6 @@ function FounderOpportunityReportCard({ report }: { report: ScanReport }) {
       </div>
     </div>
 
-    <div className="mt-5 grid gap-3 sm:grid-cols-2">
-      <ReportSection label="Problem" content={report.problem} />
-      <ReportSection label="Evidence Summary" content={report.evidence_summary} />
-      <ReportSection label="Buyer Profile" content={report.buyer_profile} />
-      <ReportSection label="Existing Workarounds" content={report.existing_workarounds} />
-      <ReportSection label="AI Advantage" content={report.ai_advantage} />
-      <ReportSection label="MVP Suggestion" content={report.mvp_suggestion} />
-      <ReportSection label="Validation Experiment" content={report.validation_experiment} />
-      <ReportSection label="Confidence Score" content={report.confidence_score?.toString() ?? null} />
-    </div>
+    <div className="mt-5"><FounderReportSections report={report} /></div>
   </Card>;
-}
-
-function ReportSection({ label, content }: { label: string; content: string | null }) {
-  return <div className="rounded-lg bg-white/[0.04] p-4">
-    <h4 className="text-xs font-medium uppercase tracking-wide text-muted">{label}</h4>
-    <p className="mt-2 text-sm leading-6">{content ?? "Not available"}</p>
-  </div>;
 }

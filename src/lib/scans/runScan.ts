@@ -90,11 +90,28 @@ function reportErrorMessage(error: unknown) {
   return "Report generation failed unexpectedly.";
 }
 
+function deduplicateEvidence(items: EvidenceItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.url?.trim().toLowerCase() || `${item.title.trim().toLowerCase()}|${item.content.trim().toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 async function collectEvidence(query: string): Promise<EvidenceItem[]> {
   const sources = [
-    { name: "Hacker News", fetch: () => fetchHackerNewsEvidence(query) },
-    { name: "Reddit", fetch: () => fetchRedditEvidence(query) }
+    {
+      name: "Hacker News",
+      fetch: () => fetchHackerNewsEvidence(query, 25)
+    },
+    {
+      name: "Reddit",
+      fetch: () => fetchRedditEvidence(query, 25)
+    }
   ];
+
   const results = await Promise.allSettled(sources.map((source) => source.fetch()));
   const evidenceItems: EvidenceItem[] = [];
 
@@ -110,7 +127,7 @@ async function collectEvidence(query: string): Promise<EvidenceItem[]> {
     throw new Error("All evidence sources failed.");
   }
 
-  return evidenceItems;
+  return deduplicateEvidence(evidenceItems);
 }
 
 async function findEvidenceId(
@@ -225,6 +242,8 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
     const evidenceItems = await collectEvidence(query);
     await saveEvidence(evidenceItems);
 
+
+
     await updateScan(supabase, scanId, {
       status: "running",
       stage: "analyzing",
@@ -235,10 +254,21 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
     });
 
     let opportunitiesCreated = 0;
+    let extractionFailures = 0;
     const opportunitiesToScore: Array<{ opportunityId: string; evidence: EvidenceItem; painScore: number }> = [];
     for (const [index, evidence] of evidenceItems.entries()) {
-      const evidenceId = await findEvidenceId(supabase, evidence);
-      const created = await createOpportunity(evidence, evidenceId);
+      let created: Awaited<ReturnType<typeof createOpportunity>> = null;
+      try {
+        const evidenceId = await findEvidenceId(supabase, evidence);
+        created = await createOpportunity(evidence, evidenceId);
+      } catch (error) {
+        extractionFailures += 1;
+        console.error("Evidence opportunity extraction failed", {
+          scanId,
+          evidenceTitle: evidence.title.slice(0, 160),
+          error: errorMessage(error).slice(0, 500)
+        });
+      }
 
       if (created) {
         if (created.isNew) {
@@ -340,8 +370,10 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       evidence_count: evidenceItems.length,
       opportunity_count: opportunitiesCreated,
       completed_at: completedAt.toISOString(),
-      error_code: null,
-      error_detail: null
+      error_code: extractionFailures > 0 ? "opportunity_extraction_partial" : null,
+      error_detail: extractionFailures > 0
+        ? `${extractionFailures} evidence item${extractionFailures === 1 ? "" : "s"} could not be converted into opportunities.`
+        : null
     });
 
     return {

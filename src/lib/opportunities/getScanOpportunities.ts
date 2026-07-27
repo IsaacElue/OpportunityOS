@@ -45,7 +45,6 @@ export async function getScanOpportunities(scanId: string): Promise<ScanOpportun
     .eq("scan_opportunities.scan_id", scanId)
     .order("opportunity_score", { ascending: false });
   if (error) throw new Error(`Unable to fetch scan opportunities: ${error.message}`);
-
   return ((data ?? []) as OpportunityRow[]).map((opportunity) => ({
     id: opportunity.id,
     title: opportunity.title,
