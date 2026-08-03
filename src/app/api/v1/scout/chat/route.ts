@@ -17,6 +17,12 @@ import { createClient } from "@/lib/supabase/server";
 
 const RESEARCH_CONFIDENCE_THRESHOLD = 50;
 
+// Both actions mean "go investigate" - the tool-planning layer already
+// treats them as equivalent (both map to the evidence_search tool), so a
+// founder asking Scout to "research" vs. "find evidence on" a market should
+// start a real scan either way.
+const RESEARCH_TRIGGER_ACTIONS = new Set(["research_market", "find_evidence"]);
+
 /** Give Scout's reasoning call short-term memory of the conversation so follow-ups make sense. */
 function buildConversationalGoal(message: string, recentMessages: ScoutConversationMessage[]) {
   if (recentMessages.length === 0) return message;
@@ -120,7 +126,7 @@ export async function POST(request: Request) {
   let action: "research_started" | "conversation" = "conversation";
   let scanId: string | undefined;
 
-  if (reasoningAvailable && decision.action === "research_market" && decision.confidence >= RESEARCH_CONFIDENCE_THRESHOLD) {
+  if (reasoningAvailable && RESEARCH_TRIGGER_ACTIONS.has(decision.action) && decision.confidence >= RESEARCH_CONFIDENCE_THRESHOLD) {
     try {
       const research = await startScoutResearch({
         organizationId: membership.organization_id,
