@@ -76,12 +76,10 @@ type SourceReportRow = {
 };
 
 function buildSearchQuery(filters: ScanFilters) {
-  return buildKeywordQuery([
-    filters.industry,
-    filters.buyer_type,
-    filters.geography,
-    ...(filters.problem_hints ?? [])
-  ]);
+  return buildKeywordQuery({
+    hints: filters.problem_hints ?? [],
+    defaults: [filters.industry, filters.buyer_type, filters.geography]
+  });
 }
 
 function clampScore(value: number) {

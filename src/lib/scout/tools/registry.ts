@@ -101,12 +101,10 @@ function buildEvidenceQuery(input: unknown) {
     ? filters.problem_hints.map(asText).filter(Boolean)
     : [];
 
-  return buildSearchQuery([
-    asText(filters.industry),
-    asText(filters.buyer_type),
-    asText(filters.geography),
-    ...hints
-  ]);
+  return buildSearchQuery({
+    hints,
+    defaults: [asText(filters.industry), asText(filters.buyer_type), asText(filters.geography)]
+  });
 }
 
 function durationSince(startedAt: number) {
