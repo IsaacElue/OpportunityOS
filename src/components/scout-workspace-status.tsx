@@ -2,6 +2,7 @@ import { Activity, Brain, CalendarClock, Compass, Lightbulb, Sparkles, type Luci
 
 import { ScoutActivityFeed, type ScoutActivityItem } from "@/components/scout-activity-feed";
 import { ScoutResearchCards, type ScoutResearchCardItem } from "@/components/scout-research-cards";
+import { LocalDateTime } from "@/components/time-display";
 import { Card } from "@/components/ui/card";
 
 export type ScoutWorkspaceStatusData = {
@@ -23,7 +24,7 @@ export function ScoutWorkspaceStatus({ data }: { data: ScoutWorkspaceStatusData 
     </div>
 
     <StatusCard icon={Compass} label="Active objectives">
-      {data.activeObjectives.length > 0 ? <div className="space-y-2">{data.activeObjectives.map((objective) => <div key={objective.id}><p className="line-clamp-2 text-sm font-medium leading-5">{objective.title}</p><p className="mt-0.5 text-xs text-brand">Updated {formatDate(objective.updatedAt)}</p></div>)}</div> : <Empty copy="No active objectives yet." />}
+      {data.activeObjectives.length > 0 ? <div className="space-y-2">{data.activeObjectives.map((objective) => <div key={objective.id}><p className="line-clamp-2 text-sm font-medium leading-5">{objective.title}</p><p className="mt-0.5 text-xs text-brand">Updated <LocalDateTime value={objective.updatedAt} fallback="Soon" /></p></div>)}</div> : <Empty copy="No active objectives yet." />}
     </StatusCard>
 
     <StatusCard icon={Lightbulb} label="Recent opportunities">
@@ -36,11 +37,11 @@ export function ScoutWorkspaceStatus({ data }: { data: ScoutWorkspaceStatusData 
     </div>
 
     <StatusCard icon={Activity} label="Recent executions">
-      {data.recentExecutions.length > 0 ? <div className="space-y-2">{data.recentExecutions.map((execution) => <div key={execution.id}><p className="text-sm font-medium capitalize">{execution.status}</p><p className="mt-0.5 text-xs text-muted">{execution.stepsCompleted} steps · {execution.toolsUsed} tools{execution.completedAt ? ` · ${formatDate(execution.completedAt)}` : ""}</p></div>)}</div> : <Empty copy="No autonomous activity yet." />}
+      {data.recentExecutions.length > 0 ? <div className="space-y-2">{data.recentExecutions.map((execution) => <div key={execution.id}><p className="text-sm font-medium capitalize">{execution.status}</p><p className="mt-0.5 text-xs text-muted">{execution.stepsCompleted} steps · {execution.toolsUsed} tools{execution.completedAt ? <> · <LocalDateTime value={execution.completedAt} fallback="Soon" /></> : null}</p></div>)}</div> : <Empty copy="No autonomous activity yet." />}
     </StatusCard>
 
     <StatusCard icon={CalendarClock} label="Scheduled research">
-      {data.upcomingSchedules.length > 0 ? <div className="space-y-2">{data.upcomingSchedules.map((schedule) => <div key={schedule.id}><div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-medium">{schedule.objectiveTitle}</p><span className="shrink-0 text-xs font-medium capitalize text-brand">{schedule.state === "scheduled" ? "Upcoming" : schedule.state}</span></div><p className="mt-0.5 text-xs text-muted">{schedule.frequency} · {schedule.state === "due" ? "Due now" : formatDate(schedule.nextRunAt)}</p>{schedule.lastRunAt ? <p className="mt-0.5 text-xs text-muted/75">Last completed {formatDate(schedule.lastRunAt)}</p> : null}</div>)}</div> : <Empty copy="No scheduled research yet." />}
+      {data.upcomingSchedules.length > 0 ? <div className="space-y-2">{data.upcomingSchedules.map((schedule) => <div key={schedule.id}><div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-medium">{schedule.objectiveTitle}</p><span className="shrink-0 text-xs font-medium capitalize text-brand">{schedule.state === "scheduled" ? "Upcoming" : schedule.state}</span></div><p className="mt-0.5 text-xs text-muted">{schedule.frequency} · {schedule.state === "due" ? "Due now" : <LocalDateTime value={schedule.nextRunAt} fallback="Soon" />}</p>{schedule.lastRunAt ? <p className="mt-0.5 text-xs text-muted/75">Last completed <LocalDateTime value={schedule.lastRunAt} fallback="Soon" /></p> : null}</div>)}</div> : <Empty copy="No scheduled research yet." />}
     </StatusCard>
 
     <ScoutResearchCards items={data.research} />
@@ -54,11 +55,4 @@ function StatusCard({ icon: Icon, label, children }: { icon: LucideIcon; label: 
 
 function Empty({ copy }: { copy: string }) {
   return <p className="text-sm leading-5 text-muted">{copy}</p>;
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Soon";
-
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }

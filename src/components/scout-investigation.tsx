@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { ScoutAvatar } from "@/components/scout-avatar";
 import { ScoutTimelineMotion } from "@/components/scout-timeline-motion";
+import { LocalTime, useHydrated } from "@/components/time-display";
 import { TypingIndicator } from "@/components/typing-indicator";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,17 +28,11 @@ function messageFor(progress: ScanProgress | null) {
   return progress.progressMessage ?? "I’m working through the evidence.";
 }
 
-function formatTimestamp(value: string | null) {
-  if (!value) return "Just now";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recent";
-  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
-}
-
-function formatDuration(start: string | null, end: string | null, active: boolean) {
+function formatDuration(start: string | null, end: string | null, nowMs: number | null) {
   if (!start) return "Unavailable";
   const startedAt = new Date(start).getTime();
-  const endedAt = end ? new Date(end).getTime() : active ? Date.now() : Number.NaN;
+  if (!end && nowMs === null) return Number.isFinite(startedAt) ? "In progress" : "Unavailable";
+  const endedAt = end ? new Date(end).getTime() : nowMs ?? Number.NaN;
   if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt) || endedAt < startedAt) return "Unavailable";
   const seconds = Math.max(0, Math.round((endedAt - startedAt) / 1000));
   if (seconds < 60) return `${seconds}s`;
@@ -64,6 +59,7 @@ function briefEvent(createdAt: string | null): ScanProgressEvent | null {
 export function ScoutInvestigation({ progress, scanId, createdAt, reportCount = 0, children }: ScoutInvestigationProps) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
+  const hydrated = useHydrated();
   const executionTriggered = useRef(false);
   const previousStage = useRef<string | null>(null);
   const [isTyping, setIsTyping] = useState(true);
@@ -140,8 +136,8 @@ export function ScoutInvestigation({ progress, scanId, createdAt, reportCount = 
       </div>
 
       <dl className="relative mt-6 grid grid-cols-2 gap-3 border-t border-white/10 pt-5 text-sm sm:grid-cols-4">
-        <Metric label="Started" value={formatTimestamp(progress?.requestedAt ?? createdAt)} />
-        <Metric label="Duration" value={formatDuration(progress?.requestedAt ?? createdAt, progress?.completedAt ?? null, !isTerminal)} />
+        <Metric label="Started" value={<LocalTime value={progress?.requestedAt ?? createdAt} fallback="Just now" />} />
+        <Metric label="Duration" value={formatDuration(progress?.requestedAt ?? createdAt, progress?.completedAt ?? null, !isTerminal && hydrated ? Date.now() : null)} />
         <Metric label="Evidence" value={String(progress?.evidenceCount ?? 0)} />
         <Metric label="Reports" value={String(reportCount)} />
       </dl>
@@ -158,7 +154,7 @@ export function ScoutInvestigation({ progress, scanId, createdAt, reportCount = 
             <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className={isActive ? "font-medium text-ink" : "text-sm font-medium"}>{labelForStage(item.stage)}</p>
-                <time dateTime={item.createdAt} className="text-xs text-muted">{formatTimestamp(item.createdAt)}</time>
+                <LocalTime value={item.createdAt} fallback="Just now" className="text-xs text-muted" />
               </div>
               <p className="mt-1 flex items-center gap-1.5 text-sm text-muted"><Search className="size-3.5" />{item.message}</p>
               {item.evidenceCount > 0 || item.opportunityCount > 0 ? <p className="mt-1 text-xs text-muted/80">{item.evidenceCount} evidence · {item.opportunityCount} opportunities</p> : null}
@@ -174,6 +170,6 @@ export function ScoutInvestigation({ progress, scanId, createdAt, reportCount = 
   </>;
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value }: { label: string; value: ReactNode }) {
   return <div><dt className="text-xs uppercase tracking-wide text-muted">{label}</dt><dd className="mt-1 font-medium text-ink">{value}</dd></div>;
 }
