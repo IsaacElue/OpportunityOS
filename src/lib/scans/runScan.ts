@@ -476,6 +476,7 @@ async function runScoringStage(
     scanId,
     stage: "generating_reports",
     message: "Preparing founder reports",
+    evidenceCount: state.evidenceItems.length,
     opportunityCount: state.opportunitiesCreated
   });
 }
