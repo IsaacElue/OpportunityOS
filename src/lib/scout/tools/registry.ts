@@ -1,7 +1,8 @@
 import "server-only";
 
+import { buildSearchQuery } from "@/lib/ingestion/buildSearchQuery";
+import { fetchGithubEvidence } from "@/lib/ingestion/github";
 import { fetchHackerNewsEvidence } from "@/lib/ingestion/hackernews";
-import { fetchRedditEvidence } from "@/lib/ingestion/reddit";
 import type { EvidenceItem } from "@/lib/ingestion/types";
 import { extractOpportunity } from "@/lib/intelligence/extractor";
 import type { OpportunityExtraction } from "@/lib/intelligence/types";
@@ -100,12 +101,12 @@ function buildEvidenceQuery(input: unknown) {
     ? filters.problem_hints.map(asText).filter(Boolean)
     : [];
 
-  return [
+  return buildSearchQuery([
     asText(filters.industry),
     asText(filters.buyer_type),
     asText(filters.geography),
     ...hints
-  ].filter(Boolean).join(" ");
+  ]);
 }
 
 function durationSince(startedAt: number) {
@@ -218,7 +219,7 @@ function objectiveToolFailure(startedAt: number, message: string, data: Record<s
 
 const evidenceSearchTool: ScoutTool = {
   name: "evidence_search",
-  description: "Search Hacker News and Reddit for current market evidence without persisting it.",
+  description: "Search Hacker News and GitHub for current market evidence without persisting it.",
   async execute(input) {
     const startedAt = Date.now();
     const query = buildEvidenceQuery(input);
@@ -237,7 +238,7 @@ const evidenceSearchTool: ScoutTool = {
 
     const sources = [
       { name: "hacker_news", search: () => fetchHackerNewsEvidence(query) },
-      { name: "reddit", search: () => fetchRedditEvidence(query) }
+      { name: "github", search: () => fetchGithubEvidence(query) }
     ];
     const results = await Promise.allSettled(sources.map((source) => source.search()));
     const evidence: EvidenceItem[] = [];

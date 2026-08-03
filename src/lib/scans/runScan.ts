@@ -1,8 +1,9 @@
 import "server-only";
 
 import type { EvidenceItem } from "@/lib/ingestion/types";
+import { buildSearchQuery as buildKeywordQuery } from "@/lib/ingestion/buildSearchQuery";
+import { fetchGithubEvidence } from "@/lib/ingestion/github";
 import { fetchHackerNewsEvidence } from "@/lib/ingestion/hackernews";
-import { fetchRedditEvidence } from "@/lib/ingestion/reddit";
 import { saveEvidence } from "@/lib/ingestion/saveEvidence";
 import { createOpportunity } from "@/lib/intelligence/createOpportunity";
 import { generateFounderOpportunityReport } from "@/lib/reports/generateReport";
@@ -55,33 +56,13 @@ type SourceReportRow = {
   url: string | null;
 };
 
-const MAX_SEARCH_QUERY_LENGTH = 140;
-
-/**
- * Builds a search query for Reddit/Hacker News. Both search unstructured
- * keyword phrases rather than natural-language sentences, so terms are
- * deduplicated and the result capped: a long, repetitive, sentence-shaped
- * query (e.g. an industry name repeated inside a founder's raw message)
- * reliably returns zero hits on both sources.
- */
 function buildSearchQuery(filters: ScanFilters) {
-  const seen = new Set<string>();
-  const words = [
+  return buildKeywordQuery([
     filters.industry,
     filters.buyer_type,
     filters.geography,
     ...(filters.problem_hints ?? [])
-  ]
-    .filter((part): part is string => Boolean(part?.trim()))
-    .flatMap((part) => part.trim().split(/\s+/))
-    .filter((word) => {
-      const key = word.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-  return words.join(" ").slice(0, MAX_SEARCH_QUERY_LENGTH).trim();
+  ]);
 }
 
 function clampScore(value: number) {
@@ -140,8 +121,8 @@ async function collectEvidence(query: string): Promise<EvidenceItem[]> {
       fetch: () => fetchHackerNewsEvidence(query, 25)
     },
     {
-      name: "Reddit",
-      fetch: () => fetchRedditEvidence(query, 25)
+      name: "GitHub",
+      fetch: () => fetchGithubEvidence(query, 25)
     }
   ];
 
@@ -279,9 +260,9 @@ export async function runScan(scanId: string): Promise<ScanRunSummary> {
       stage: "searching_sources",
       progress: 15,
       progress_stage: "searching_sources",
-      progress_message: "Searching Reddit and Hacker News"
+      progress_message: "Searching Hacker News and GitHub"
     });
-    await recordProgressSafely({ scanId, stage: "searching_sources", message: "Searching Reddit and Hacker News" });
+    await recordProgressSafely({ scanId, stage: "searching_sources", message: "Searching Hacker News and GitHub" });
 
     const collectedEvidence = await collectEvidence(query);
     await updateScan(supabase, scanId, {
