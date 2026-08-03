@@ -55,13 +55,33 @@ type SourceReportRow = {
   url: string | null;
 };
 
+const MAX_SEARCH_QUERY_LENGTH = 140;
+
+/**
+ * Builds a search query for Reddit/Hacker News. Both search unstructured
+ * keyword phrases rather than natural-language sentences, so terms are
+ * deduplicated and the result capped: a long, repetitive, sentence-shaped
+ * query (e.g. an industry name repeated inside a founder's raw message)
+ * reliably returns zero hits on both sources.
+ */
 function buildSearchQuery(filters: ScanFilters) {
-  return [
+  const seen = new Set<string>();
+  const words = [
     filters.industry,
     filters.buyer_type,
     filters.geography,
     ...(filters.problem_hints ?? [])
-  ].filter((part): part is string => Boolean(part?.trim())).join(" ");
+  ]
+    .filter((part): part is string => Boolean(part?.trim()))
+    .flatMap((part) => part.trim().split(/\s+/))
+    .filter((word) => {
+      const key = word.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  return words.join(" ").slice(0, MAX_SEARCH_QUERY_LENGTH).trim();
 }
 
 function clampScore(value: number) {
@@ -130,10 +150,11 @@ async function collectEvidence(query: string): Promise<EvidenceItem[]> {
 
   for (const [index, result] of results.entries()) {
     if (result.status === "fulfilled") {
+      console.log("Evidence source succeeded", { source: sources[index].name, count: result.value.length, query });
       evidenceItems.push(...result.value);
       continue;
     }
-    console.error("Evidence source failed", { source: sources[index].name, error: result.reason });
+    console.error("Evidence source failed", { source: sources[index].name, query, error: errorMessage(result.reason) });
   }
 
   if (results.every((result) => result.status === "rejected")) {
