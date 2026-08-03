@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { errorResponse } from "@/lib/errors";
 import { createScoutBrainContext } from "@/lib/scout/brain";
-import { handleScoutMessage } from "@/lib/scout/chat";
+import { reasonWithScout } from "@/lib/scout/intelligence/reason";
 import {
   appendMessage,
   createConversation,
@@ -11,8 +11,22 @@ import {
   getRecentMessages,
   listConversations
 } from "@/lib/scout/conversation";
+import type { ScoutConversationMessage } from "@/lib/scout/conversation/types";
 import { startScoutResearch } from "@/lib/scout/research";
 import { createClient } from "@/lib/supabase/server";
+
+const RESEARCH_CONFIDENCE_THRESHOLD = 50;
+
+/** Give Scout's reasoning call short-term memory of the conversation so follow-ups make sense. */
+function buildConversationalGoal(message: string, recentMessages: ScoutConversationMessage[]) {
+  if (recentMessages.length === 0) return message;
+
+  const transcript = recentMessages
+    .slice(-6)
+    .map((entry) => `${entry.role === "user" ? "Founder" : "Scout"}: ${entry.content}`)
+    .join("\n");
+  return `Recent conversation:\n${transcript}\n\nFounder's latest message: ${message}`;
+}
 
 const scoutChatSchema = z.object({
   message: z.string().trim().min(1).max(500),
@@ -91,12 +105,22 @@ export async function POST(request: Request) {
     return errorResponse(500, "scout_context_failed", "Scout could not prepare your research context.", true);
   }
 
-  const chat = handleScoutMessage({ context, message: parsed.data.message, recentMessages });
-  let responseMessage = chat.response;
+  const decision = await reasonWithScout({
+    context,
+    goal: buildConversationalGoal(parsed.data.message, recentMessages)
+  });
+
+  // A confidence of exactly 0 only happens when reasoning fell back to a
+  // safe default (no API key, or the model call failed) rather than an
+  // actual decision - don't act on it or repeat its literal wording back.
+  const reasoningAvailable = decision.confidence > 0;
+  let responseMessage = reasoningAvailable
+    ? decision.reasoning
+    : "Scout is having trouble thinking that through right now. Please try again in a moment.";
   let action: "research_started" | "conversation" = "conversation";
   let scanId: string | undefined;
 
-  if (chat.shouldResearch) {
+  if (reasoningAvailable && decision.action === "research_market" && decision.confidence >= RESEARCH_CONFIDENCE_THRESHOLD) {
     try {
       const research = await startScoutResearch({
         organizationId: membership.organization_id,
