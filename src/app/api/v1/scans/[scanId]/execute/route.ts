@@ -4,6 +4,11 @@ import { errorResponse, publicError } from "@/lib/errors";
 import { runScan } from "@/lib/scans/runScan";
 import { createClient } from "@/lib/supabase/server";
 
+// A scan resumes across many short calls to this route (one bounded pipeline
+// step per call) rather than completing in a single request; this ceiling is
+// headroom for an individual step, not the whole scan.
+export const maxDuration = 60;
+
 export async function POST(_request: Request, { params }: { params: Promise<{ scanId: string }> }) {
   const { scanId } = await params;
   const supabase = await createClient();
@@ -27,16 +32,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ sc
   if (error) return errorResponse(500, "scan_lookup_failed", "We could not start that research brief.", true);
   if (!scan) return errorResponse(404, "scan_not_found", "That research brief does not exist.");
 
-  if (scan.status === "completed" || scan.status === "running") {
+  if (scan.status === "completed") {
     return NextResponse.json({ id: scan.id, status: scan.status });
   }
-  if (scan.status !== "queued") {
+  if (scan.status !== "queued" && scan.status !== "running") {
     return errorResponse(409, "scan_not_executable", "This research brief cannot be started.");
   }
 
   try {
-    const summary = await runScan(scan.id);
-    return NextResponse.json({ id: summary.scanId, status: "completed" });
+    const result = await runScan(scan.id);
+    return NextResponse.json({ id: result.scanId, status: result.status });
   } catch (executionError) {
     console.error("Scan execution failed", { scanId: scan.id, error: executionError });
     return NextResponse.json({
