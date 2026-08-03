@@ -1,3 +1,5 @@
+const shortDate = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
+
 export function formatRelativeTime(value: string | null | undefined) {
   if (!value) return "Recently";
   const timestamp = new Date(value).getTime();
@@ -7,5 +9,6 @@ export function formatRelativeTime(value: string | null | undefined) {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+  if (hours < 48) return "Yesterday";
+  return shortDate.format(new Date(timestamp));
 }

@@ -9,6 +9,7 @@ import { ScoutMessageBubble } from "@/components/scout-message-bubble";
 import { ScoutReasoningStatus } from "@/components/scout-reasoning-status";
 import { ScoutStepCard, type ScoutRuntimeStep } from "@/components/scout-step-card";
 import { ScoutToolBadge, type ScoutToolStatus } from "@/components/scout-tool-badge";
+import { LocalTime } from "@/components/time-display";
 import { cn } from "@/lib/utils";
 
 export type ScoutRuntimeTool = { name: string; status?: ScoutToolStatus; durationMs?: number | null; timestamp?: string | null };
@@ -26,9 +27,9 @@ export type ScoutRuntimeSnapshot = {
 
 export function ScoutRuntimePanel({ runtime, className }: { runtime?: ScoutRuntimeSnapshot | null; className?: string }) {
   const reduceMotion = useReducedMotion();
+  const headingId = useId();
   if (!runtime) return <ScoutCurrentTask className={className} task={{ state: "idle", title: "Scout is ready", description: "No execution is currently active. Give Scout a goal when you are ready.", estimatedStage: "Waiting for a goal", stages: [{ label: "Ready", status: "current" }, { label: "Research", status: "upcoming" }, { label: "Report", status: "upcoming" }] }} />;
 
-  const headingId = useId();
   const steps = runtime.steps ?? [];
   const currentStep = runtime.currentStep ?? steps.find((step) => step.status === "running") ?? null;
   const activeTask = currentStep ?? { id: "runtime-stage", title: runtime.executionStage, description: "Scout is progressing through the current execution stage.", status: "running" as const };
@@ -39,11 +40,6 @@ export function ScoutRuntimePanel({ runtime, className }: { runtime?: ScoutRunti
     {steps.length > 0 ? <div className="mt-5 space-y-2"><p className="scout-eyebrow">Execution steps</p>{steps.map((step, index) => <ScoutStepCard key={step.id} step={step} index={index} />)}</div> : null}
     {runtime.completedTools && runtime.completedTools.length > 0 ? <details className="group mt-5 rounded-2xl border border-white/10 bg-white/[0.02] p-3"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand/60"><span>Completed tools ({runtime.completedTools.length})</span><ChevronDown className="size-4 text-muted transition-transform group-open:rotate-180" /></summary><div className="mt-3 flex flex-wrap gap-2">{runtime.completedTools.map((tool, index) => <ScoutToolBadge key={`${tool.name}-${index}`} name={tool.name} status={tool.status ?? "completed"} durationMs={tool.durationMs} timestamp={tool.timestamp} />)}</div></details> : null}
     {runtime.finalResponse ? <motion.div initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.25 }} className="mt-5"><p className="scout-eyebrow">Final response</p><ScoutMessageBubble role="scout" className="mt-2"><p>{runtime.finalResponse}</p></ScoutMessageBubble></motion.div> : null}
-    {runtime.startedAt ? <p className="mt-5 text-xs text-muted">Started {formatTimestamp(runtime.startedAt)}</p> : null}
+    {runtime.startedAt ? <p className="mt-5 text-xs text-muted">Started <LocalTime value={runtime.startedAt} fallback="recently" /></p> : null}
   </div></section>;
-}
-
-function formatTimestamp(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "recently" : new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
 }

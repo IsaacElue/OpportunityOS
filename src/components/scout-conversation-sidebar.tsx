@@ -4,6 +4,7 @@ import { MessageCircle, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ScoutAvatar } from "@/components/scout-avatar";
+import { RelativeTime } from "@/components/time-display";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -69,23 +70,10 @@ export function ScoutConversationSidebar({
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{conversation.title}</span>
             <span className="mt-0.5 block truncate text-xs text-muted">{conversation.preview ?? "No messages yet"}</span>
-            <span className="mt-1 block text-xs text-muted/70">{formatUpdatedAt(conversation.updatedAt)}</span>
+            <RelativeTime value={conversation.updatedAt} fallback="Recent" className="mt-1 block text-xs text-muted/70" />
           </span>
         </button>) : <p className="px-3 py-4 text-sm leading-6 text-muted">{search.trim() ? "No conversations match that search." : "Your conversations with Scout will appear here."}</p>}
       </div>
     </div>
   </aside>;
-}
-
-function formatUpdatedAt(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recent";
-
-  const minutes = Math.round((Date.now() - date.getTime()) / 60_000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  if (hours < 48) return "Yesterday";
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
 }
