@@ -60,7 +60,7 @@ export function ScoutInvestigation({ progress, scanId, createdAt, reportCount = 
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const hydrated = useHydrated();
-  const executionTriggered = useRef(false);
+  const executionInFlight = useRef(false);
   const previousStage = useRef<string | null>(null);
   const [isTyping, setIsTyping] = useState(true);
   const [executionError, setExecutionError] = useState<string | null>(null);
@@ -70,25 +70,29 @@ export function ScoutInvestigation({ progress, scanId, createdAt, reportCount = 
   const activeEvent = !isTerminal ? events.at(-1) : null;
 
   async function triggerExecution() {
-    if (executionTriggered.current) return;
-    executionTriggered.current = true;
+    if (executionInFlight.current) return;
+    executionInFlight.current = true;
     setExecutionError(null);
     try {
       const response = await fetch(`/api/v1/scans/${scanId}/execute`, { method: "POST" });
       if (response.ok) return;
       const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
       setExecutionError(body?.error?.message ?? "Scout could not start this investigation. Please try again.");
-      executionTriggered.current = false;
     } catch {
       setExecutionError("Scout could not start this investigation. Please try again.");
-      executionTriggered.current = false;
+    } finally {
+      executionInFlight.current = false;
     }
   }
 
+  // A scan resumes across many short server calls (one bounded pipeline step
+  // each) rather than finishing in a single request, so this keeps nudging it
+  // forward on every poll tick until it reaches a terminal status.
   useEffect(() => {
-    if (progress?.status !== "queued") return;
+    if (isTerminal) return;
+    if (progress?.status !== "queued" && progress?.status !== "running") return;
     void triggerExecution();
-  }, [progress?.status, scanId]);
+  }, [progress, isTerminal, scanId]);
 
   useEffect(() => {
     if (isTerminal) return;
